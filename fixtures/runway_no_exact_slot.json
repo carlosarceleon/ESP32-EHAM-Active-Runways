@@ -1,0 +1,16 @@
+{
+  "times": [
+    {
+      "from": "2026-07-21T00:00:00+00:00",
+      "until": "2026-07-21T04:40:00+00:00",
+      "landingRunways": ["06"],
+      "departingRunways": ["36L"]
+    },
+    {
+      "from": "2026-07-21T05:00:00+00:00",
+      "until": "2026-07-21T05:30:00+00:00",
+      "landingRunways": ["06", "36R"],
+      "departingRunways": ["36L"]
+    }
+  ]
+}

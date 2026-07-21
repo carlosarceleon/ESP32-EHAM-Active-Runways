@@ -18,93 +18,63 @@
 > before you stop — don't append. Keep it short: status, what's next, and any
 > non-obvious lessons the plan doesn't already cover.
 
-**Status (2026-07-21):** Milestones 1-4 are done. Milestone 4 is on branch
-`milestone-4-clock-sync`, not yet merged/PR'd against `main`. `main.cpp`
-still renders the static EHAM runway screen (all-inactive state, or
-fixture-cycling under `EHAM_ENABLE_FIXTURES`) — live runway data still lands
-in Milestone 5. The clock is wired up but nothing consumes it yet (no
-"last updated" timestamp on screen — that's later UI work).
+**Status (2026-07-21):** Milestones 1-5 are done. Milestone 5 is on branch
+`milestone-5-live-runway-data`, not yet merged/PR'd against `main`. `main.cpp`
+now fetches and displays live EHAM runway usage; nothing else remains before
+Milestone 6 (KNMI config repo) / 7 (KNMI token manager + METAR) — the weather
+half of the product definition is still entirely unimplemented.
 
-**Milestone 4 changes:** added `services::clock` (`include/services/clock_service.h`,
-`src/services/clock_service.cpp`) with `beginClockSync()` /
-`clockLoop()` / `clockIsValid()` / `nowUtc()` / `formatLocalDate()` /
-`formatLocalTime()` / `parseIso8601ToUtc()`. `main.cpp` calls
-`beginClockSync()` right after a successful `wifiSetupConnect()`, and
-`clockLoop()` every non-fixture `loop()` iteration. Timezone handling uses
-the POSIX TZ string `CET-1CEST,M3.5.0,M10.5.0/3` via `configTzTime()` — no
-manual DST math needed, the libc TZ machinery does it. `parseIso8601ToUtc()`
-is a dependency-free pure function (Howard Hinnant's `daysFromCivil`
-algorithm for the UTC day count) so it doesn't rely on `timegm()` (not
-available in this toolchain) or on the system TZ being anything in
-particular. Added `fixtures/timestamps.txt` (human-readable ISO-8601 test
-vectors) and `tools/validate_fixtures.py` (independently cross-checks that
-file against Python's stdlib parser — doesn't touch device code). The
-on-device self-test (`runClockSelfTest()`, gated by `EHAM_ENABLE_FIXTURES`
-like the existing `data::eham_runways::runSelfTest()`) hardcodes the same
-vectors as `fixtures/timestamps.txt` — there's no on-device file reading, so
-the two are kept in sync by hand; a comment in each points at the other.
+**Milestone 5 changes:** added `services::runway` as two files —
+`runway_parser.h/.cpp` (pure `parseRunwayResponse(json, len, now_utc, out,
+&slot_from, &slot_until)`, reuses `services::clock::parseIso8601ToUtc` for
+timestamps and `data::eham_runways::applyLanding/applyDeparture` for
+normalization + mapping; unknown headings are logged and skipped, not
+fatal) and `runway_client.h/.cpp` (HTTPClient + `WiFiClientSecure::setInsecure()`
+fetch, 5-minute/1-minute/5-minute-after-3-failures scheduling, 15-minute
+freshness limit that clears state and sets `runway_data_stale` past it,
+previous-local-date retry near midnight). `main.cpp` calls
+`services::runway::runwayLoop()` every connected `loop()` iteration and
+redraws via `ui::ehamDisplayDraw()` only when `consumeStateChanged()` is
+true. BOOT short tap now calls `forceRefresh()` instead of the old
+fixture-cycler (fixture-cycling is unchanged/still fixture-build-only).
+`ui::eham_display` gained a `LIVE DATA UNAVAILABLE` banner drawn whenever
+`!state.runway_data_available` (covers both "never fetched yet" and
+"stale past 15 minutes"). Added `tools/capture_runway_fixture.py` (fetches
+and sanitizes a real response — the live API needs no auth or sanitizing of
+secrets, it's public) and three fixtures: `runway_current.json` (a real
+21-slot day captured 2026-07-21), `runway_no_exact_slot.json` and
+`runway_malformed.json` (hand-built for the bounded-fallback/stale-rejection
+and malformed-JSON paths). The on-device self-test
+(`runParserSelfTest()`, gated by `EHAM_ENABLE_FIXTURES`) hardcodes JSON
+snippets mirroring those two hand-built fixtures — same "no on-device file
+reading" constraint as the clock self-test, kept in sync by hand.
+`docs/external-data-contracts.md` documents the observed response shape.
 
-**Next up: Milestone 5** (implement and integrate live runway data).
+**Next up: Milestone 6** (public KNMI token manifest repo + validation
+scripts/CI) then **Milestone 7** (KNMI token manager + METAR client on
+device). Both are additive — no runway code should need to change for them.
 
-**Lessons learned from Milestone 4:**
+**Lessons learned from Milestone 5:**
 
-- This toolchain (GCC 8.4 / ESP32-C3) does not provide `timegm()`. Don't
-  reach for it for UTC-safe epoch conversion — implement the day-count
-  math directly (see `daysFromCivil` in `clock_service.cpp`) instead of
-  fighting `mktime`/TZ environment state.
-- `configTzTime(tz, ntp1, ntp2)` is fire-and-forget; there's no callback for
-  "sync done" by default. Polling `time(nullptr) >= <plausible epoch>` in
-  `clockLoop()` each iteration is simpler than wiring
-  `sntp_set_time_sync_notification_cb` and works fine given the 10ms loop
-  delay already in `main.cpp`.
-- Cross-checking fixture expectations with an independent implementation
-  (here, `tools/validate_fixtures.py` against Python's `datetime`) caught a
-  hand-computed epoch mistake in the CEST test vector before it ever reached
-  hardware — worth doing again for any future milestone with hand-derived
-  numeric expected values.
-
-**Lessons learned from Milestone 3:**
-
-- `wifi_setup.cpp` no longer needs `services/radar_location.h` or
-  `ui/radar_range.h` at all — those were only pulled in for the portal
-  fields removed this milestone.
-
-**Lessons learned:**
-
-- **PlatformIO wasn't preinstalled** in this environment but `pip`/`pipx`
-  were available — `pipx install platformio` works and gives a real build
-  check (`pio run -e supermini`, `pio run -e supermini_eham_selftest`) instead
-  of relying on manual code review. Do this early in any milestone; don't
-  assume you have to review-only.
-- **GCC 8.4 (this project's ESP32-C3 toolchain) rejects brace-return
-  aggregate init on a struct with default member initializers** (e.g.
-  `struct Vec2 { float x = 0.0f; float y = 0.0f; };` then `return {a, b};`
-  fails to compile even under `-std=gnu++17`). Drop the default member
-  initializers (plain aggregate, no in-class defaults) if you need this
-  pattern — every call site should supply both fields anyway.
-- **`main.cpp` still needs `services::location::init()` and
-  `ui::radar::rangeInit()`** even though the EHAM screen itself doesn't use
-  lat/lon or range presets — `src/services/wifi_setup.cpp` reads
-  `ui::radar::useMiles()/showRunways()` and `services::location::lat()/lon()`
-  directly to populate the WiFiManager portal fields. Don't strip these
-  calls out of `main.cpp` until Milestone 3 actually removes those portal
-  fields.
-- **The GC9A01 panel needs a manual R/B swap in software** for colors drawn
-  into an `LGFX_Sprite` — `cfg.rgb_order` in `lgfx_config.hpp` does not
-  appear to affect sprite content, only direct panel writes (this was
-  already discovered for the radar's aircraft-red marker in Milestone-era
-  code; Milestone 2's `ui::schiphol::toPanelColor()` centralizes it for the
-  new palette). This is unverified on real hardware for the *new* palette —
-  no physical GC9A01 was available in this session. Run
-  `ui::schiphol::paletteCalibrationDraw()` on the device before trusting the
-  Schiphol colors, per Milestone 2's own acceptance intent.
-- The user separately asked (mid-Milestone-2) to rename all remaining
-  `plane-radar-*`/`PlaneRadar`/`planeradar` leftovers (CI artifact names,
-  NVS namespace, partition/script filenames, README) to `eham-runways`. Kept
-  as its own commit ahead of the milestone commit — worth doing as a
-  separate pass like that again if similar rename debt surfaces, since it's
-  unrelated to the milestone's acceptance criteria and easy to review in
-  isolation.
+- The dutchplanespotters endpoint is reachable directly from this dev
+  environment (`curl https://www.dutchplanespotters.nl/api/runways/ams?date=...`)
+  — no need to guess the response shape from the reference Home Assistant
+  integration's source. Capture a real fixture before writing the parser;
+  it's faster and removes a class of format-mismatch bugs.
+- A day's response is chronological but not guaranteed gap-free (adjacent
+  slots can differ by seconds due to how LVNL publishes updates) — the
+  "most recent past slot, bounded to `kBoundedFallbackSec`" fallback rule
+  in the plan is doing real work, not just handling a hypothetical edge case.
+- Kept the HTTP fetch fully blocking within its timeout (no poll-callback
+  threading like `adsb_client.cpp` uses) since the plan explicitly allows
+  blocking HTTP calls and this fetch only runs every 5 minutes — don't
+  reach for the poll-fn pattern here, it's solving a problem (keeping a
+  *frequent* 3-second poll loop responsive) that doesn't exist for runway
+  data.
+- `EhamOperationalState{}` reset-on-stale also clears `weather` — harmless
+  today since nothing populates it yet, but Milestone 6/7 will need to stop
+  doing a whole-struct reset once weather has its own independent freshness
+  rule (plan §12/§13 don't tie weather validity to runway validity).
 
 ---
 

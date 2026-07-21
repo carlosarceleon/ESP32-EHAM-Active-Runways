@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 
 #include <driver/gpio.h>
@@ -54,6 +55,19 @@ constexpr unsigned long kAdsbFetchIntervalMs = 3000;
 constexpr float kAdsbFetchRadiusScale = 1.0f;
 /** false = hide aircraft with alt_baro "ground"; true = show them too. */
 constexpr bool kAdsbShowGroundAircraft = false;
+
+// --- Schiphol runway API ---
+constexpr char kRunwayApiUrl[] = "https://www.dutchplanespotters.nl/api/runways/ams";
+constexpr char kHttpUserAgent[] = "ESP32-Schiphol-Runway-Display/1.0";
+constexpr unsigned long kHttpConnectTimeoutMs = 5000;
+constexpr unsigned long kHttpTotalTimeoutMs = 12000;
+constexpr size_t kRunwayMaxBodyBytes = 64 * 1024;
+constexpr unsigned long kRunwayFetchIntervalMs = 5UL * 60 * 1000;
+constexpr unsigned long kRunwayRetryIntervalMs = 60UL * 1000;
+constexpr unsigned long kRunwaySlowRetryIntervalMs = 5UL * 60 * 1000;
+constexpr uint8_t kRunwayFailuresBeforeSlowBackoff = 3;
+/** Keep showing the last successful fetch as "live" for this long before clearing it. */
+constexpr long kRunwayFreshnessLimitSec = 15 * 60;
 
 // --- UI colors (RGB565) — status screens ---
 constexpr uint16_t kColorBlack = 0x0000;

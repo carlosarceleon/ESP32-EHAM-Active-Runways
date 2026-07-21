@@ -10,6 +10,8 @@
 #include "domain/eham_state.h"
 #include "hardware/display.h"
 #include "services/clock_service.h"
+#include "services/runway_client.h"
+#include "services/runway_parser.h"
 #include "services/wifi_setup.h"
 #include "ui/eham_display.h"
 #include "ui/schiphol_theme.h"
@@ -59,9 +61,7 @@ void showEhamScreenIfConnected() {
     g_screen_visible = false;
     return;
   }
-  // Live runway data lands in a later milestone; render the deterministic
-  // all-inactive state until then.
-  ui::ehamDisplayDraw(EhamOperationalState{});
+  ui::ehamDisplayDraw(services::runway::currentState());
   g_screen_visible = true;
 }
 
@@ -73,7 +73,8 @@ void handleBootButton() {
 #if defined(EHAM_ENABLE_FIXTURES)
     onBootTap();
 #else
-    Serial.println("BOOT tap — force refresh requested");
+    Serial.println("BOOT tap — forcing runway refresh");
+    services::runway::forceRefresh();
 #endif
   }
 }
@@ -93,6 +94,7 @@ void setup() {
 #if defined(EHAM_ENABLE_FIXTURES)
   data::eham_runways::runSelfTest();
   services::clock::runClockSelfTest();
+  services::runway::runParserSelfTest();
   drawCurrentFixture();
 #else
   if (wifiShowsSetupScreenOnBoot()) {
@@ -136,6 +138,11 @@ void loop() {
     g_wifi_down_since = 0;
     if (!g_screen_visible) {
       showEhamScreenIfConnected();
+    }
+
+    services::runway::runwayLoop();
+    if (services::runway::consumeStateChanged() && g_screen_visible) {
+      ui::ehamDisplayDraw(services::runway::currentState());
     }
   }
 #endif
