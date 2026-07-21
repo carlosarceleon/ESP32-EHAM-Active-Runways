@@ -7,11 +7,11 @@
 namespace config {
 
 // --- Wi-Fi portal ---
-constexpr char kPortalApName[] = "PlaneRadar-Setup";
+constexpr char kPortalApName[] = "EhamRunways-Setup";
 constexpr char kPortalIp[] = "192.168.4.1";
-/** mDNS host (no ".local" suffix); browser: http://plane-radar.local */
-constexpr char kPortalHostname[] = "plane-radar";
-constexpr char kPortalHostUrl[] = "plane-radar.local";
+/** mDNS host (no ".local" suffix); browser: http://eham-runways.local */
+constexpr char kPortalHostname[] = "eham-runways";
+constexpr char kPortalHostUrl[] = "eham-runways.local";
 
 /** Per-attempt STA connect wait (ms); retried kWifiConnectAttempts times. */
 constexpr unsigned long kWifiConnectAttemptMs = 15000;

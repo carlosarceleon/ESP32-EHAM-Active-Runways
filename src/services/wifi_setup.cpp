@@ -54,7 +54,7 @@ void initBootButton() {
 
 namespace {
 
-/** Separate from planeradar prefs (rangeInit) to avoid NVS handle conflicts. */
+/** Separate from ehamrunways prefs (rangeInit) to avoid NVS handle conflicts. */
 constexpr char kWifiPrefsNamespace[] = "wifi";
 constexpr char kPrefsForcePortalKey[] = "portal";
 
