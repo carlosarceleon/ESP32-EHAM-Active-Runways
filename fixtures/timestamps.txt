@@ -1,0 +1,24 @@
+# ISO-8601 parser fixtures for services::clock::parseIso8601ToUtc.
+#
+# Format: <input> TAB <expected_utc_iso8601 | INVALID>
+#
+# Kept in sync by hand with the hardcoded self-test vectors in
+# src/services/clock_service.cpp (runClockSelfTest). Run
+# `python3 tools/validate_fixtures.py` to check this file's expectations
+# against an independent (Python stdlib) ISO-8601 parser — it does not talk
+# to the device.
+
+2026-01-15T12:00:00Z	2026-01-15T12:00:00Z
+2026-01-15T12:00:00+00:00	2026-01-15T12:00:00Z
+2026-01-15T13:00:00+01:00	2026-01-15T12:00:00Z
+2026-07-15T14:00:00+02:00	2026-07-15T12:00:00Z
+2026-01-15T07:00:00-05:00	2026-01-15T12:00:00Z
+2026-01-15T12:00:00.123Z	2026-01-15T12:00:00Z
+2024-02-29T00:00:00Z	2024-02-29T00:00:00Z
+2026-01-01T00:00:00Z	2026-01-01T00:00:00Z
+2026-01-15T12:00:00	INVALID
+2026-13-01T00:00:00Z	INVALID
+2026-02-29T00:00:00Z	INVALID
+not-a-timestamp	INVALID
+2026-01-15T12:00	INVALID
+2026-01-15T12:00:00+0100	INVALID

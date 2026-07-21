@@ -9,6 +9,7 @@
 #include "config.h"
 #include "domain/eham_state.h"
 #include "hardware/display.h"
+#include "services/clock_service.h"
 #include "services/wifi_setup.h"
 #include "ui/eham_display.h"
 #include "ui/schiphol_theme.h"
@@ -91,6 +92,7 @@ void setup() {
 
 #if defined(EHAM_ENABLE_FIXTURES)
   data::eham_runways::runSelfTest();
+  services::clock::runClockSelfTest();
   drawCurrentFixture();
 #else
   if (wifiShowsSetupScreenOnBoot()) {
@@ -98,6 +100,7 @@ void setup() {
   }
 
   if (wifiSetupConnect()) {
+    services::clock::beginClockSync();
     showEhamScreenIfConnected();
   }
 #endif
@@ -108,6 +111,7 @@ void loop() {
 
 #if !defined(EHAM_ENABLE_FIXTURES)
   wifiLoop();
+  services::clock::clockLoop();
 
   if (WiFi.status() != WL_CONNECTED) {
     if (g_screen_visible) {
