@@ -1,23 +1,23 @@
-# Plane Radar
+# EHAM Active Runways
 
 <img width="800" height="450" alt="plane-radar" src="https://github.com/user-attachments/assets/716d0992-dab8-47ba-8f1a-2aec7f607419" />
 
-**3D printed case (STL + assembly):** [MakerWorld](https://makerworld.com/en/models/2872376-esp32-plane-radar-live-ads-b-on-a-round-display#profileId-3207083) · **Firmware:** [Releases](https://github.com/MatixYo/ESP32-Plane-Radar/releases)
+**3D printed case (STL + assembly):** [MakerWorld](https://makerworld.com/en/models/2872376-esp32-plane-radar-live-ads-b-on-a-round-display#profileId-3207083)
 
-Firmware for an **ESP32-C3 Super Mini** and a **1.28″ round GC9A01** display (240×240). Shows a circular **ADS-B radar** around your configured location, with **WiFiManager** for first-time setup.
+Firmware for an **ESP32-C3 Super Mini** and a **1.28″ round GC9A01** display (240×240). Shows the active landing and departure runways at **Amsterdam Schiphol (EHAM)**, with **WiFiManager** for first-time setup. Forked from [MatixYo/ESP32-Plane-Radar](https://github.com/MatixYo/ESP32-Plane-Radar), which this firmware still contains as an unused legacy ADS-B radar mode (`src/ui/radar_display.cpp` and related files).
 
 ## What it does
 
-1. **Wi‑Fi setup** (if needed) — captive portal on AP **`PlaneRadar-Setup`**
-2. **Radar** — live aircraft from [adsb.fi](https://opendata.adsb.fi/) on a sonar-style grid
+1. **Wi‑Fi setup** (if needed) — captive portal on AP **`EhamRunways-Setup`**
+2. **Runway status** — active EHAM landing/departure runways rendered on a stylized Schiphol map
 
-After Wi‑Fi is saved, the device reconnects automatically; the radar runs in the main loop with periodic ADS-B updates (~5 s).
+After Wi‑Fi is saved, the device reconnects automatically. The current milestone renders the EHAM runway screen from fixed/fixture data; live runway and weather fetching land in later milestones (see `docs/agent-instructions/ESP32_Schiphol_Runway_Display_Implementation_Plan.md`).
 
 ## Controls (BOOT, GPIO 9, active LOW)
 
 | Action | Effect |
 |--------|--------|
-| **Short tap** | Cycle range preset (5 → 10 → 15 → 25 km); saved to flash |
+| **Short tap** | Test builds only (`supermini_eham_selftest`): cycle EHAM fixture states |
 | **Hold 3 s** | Clear Wi‑Fi, location, and units; reboot into setup portal |
 
 During setup you can also hold BOOT at power-on to force a credential reset (same as the long press).
@@ -26,16 +26,16 @@ During setup you can also hold BOOT at power-on to force a credential reset (sam
 
 **First-time setup** (no saved Wi‑Fi):
 
-1. Connect to **`PlaneRadar-Setup`**
-2. Open **`http://plane-radar.local`** (preferred) or **`http://192.168.4.1`** — both are shown on the yellow setup screen; captive portal may open automatically
+1. Connect to **`EhamRunways-Setup`**
+2. Open **`http://eham-runways.local`** (preferred) or **`http://192.168.4.1`** — both are shown on the yellow setup screen; captive portal may open automatically
 3. Set home Wi‑Fi, then save
 
 **Reconfigure anytime** (after the device is on your network):
 
-1. Open **`http://plane-radar.local`** or **`http://<device-ip>`** (e.g. from your router or serial log at boot)
+1. Open **`http://eham-runways.local`** or **`http://<device-ip>`** (e.g. from your router or serial log at boot)
 2. Change Wi‑Fi, location, units, or runway overlay; save
 
-The same portal runs on the setup AP and on the device’s LAN IP while connected to Wi‑Fi. mDNS hostname is `plane-radar` → **plane-radar.local** (`kPortalHostname` in `config.h`). Some clients resolve `.local` slowly; use the IP if needed.
+The same portal runs on the setup AP and on the device’s LAN IP while connected to Wi‑Fi. mDNS hostname is `eham-runways` → **eham-runways.local** (`kPortalHostname` in `config.h`). Some clients resolve `.local` slowly; use the IP if needed.
 
 **Custom fields** (stored in NVS):
 
@@ -47,7 +47,9 @@ The same portal runs on the setup AP and on the device’s LAN IP while connecte
 
 After a reset, the device reboots and shows the setup screen immediately (no “Connecting” loop on stale credentials).
 
-## Radar display
+## Legacy radar mode (unused, kept for reference)
+
+The original ADS-B radar screen this project was forked from is no longer wired up in `main.cpp`, but its source remains in the repo (`src/ui/radar_display.cpp`, `src/services/adsb_client.cpp`, `src/ui/runway_overlay.cpp`, etc.) for reference and possible reuse.
 
 ### Grid
 
@@ -66,7 +68,7 @@ Layout and colors: `include/ui/radar_theme.h`.
 | 15 km / 9 mi | ~20 km |
 | 25 km / 16 mi | ~33.3 km |
 
-Preset and miles/km choice persist across reboot (`planeradar` NVS namespace).
+Preset and miles/km choice persist across reboot (`ehamrunways` NVS namespace).
 
 ### Runways
 
@@ -171,7 +173,7 @@ chmod +x scripts/merge-firmware.sh   # once
 ./scripts/merge-firmware.sh
 ```
 
-Writes `release/plane-radar-merged.bin`. Skip rebuild if firmware is already built:
+Writes `release/eham-runways-merged.bin`. Skip rebuild if firmware is already built:
 
 ```bash
 ./scripts/merge-firmware.sh --no-build
@@ -190,8 +192,8 @@ Put the board in download mode (hold **BOOT**, tap **RESET**), then flash with C
 
 | Workflow | When | Output |
 |----------|------|--------|
-| [Build](.github/workflows/build.yml) | Push / PR to `main` | Artifact `plane-radar-supermini` (merged + split `.bin` files, ~90 days) |
-| [Release](.github/workflows/release.yml) | Git tag `v*` (e.g. `v1.0.0`) | GitHub Release asset `plane-radar-v1.0.0.bin` + `.sha256` |
+| [Build](.github/workflows/build.yml) | Push / PR to `main` | Artifact `eham-runways-supermini` (merged + split `.bin` files, ~90 days) |
+| [Release](.github/workflows/release.yml) | Git tag `v*` (e.g. `v1.0.0`) | GitHub Release asset `eham-runways-v1.0.0.bin` + `.sha256` |
 
 To ship a version users can download:
 

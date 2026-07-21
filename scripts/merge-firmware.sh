@@ -5,7 +5,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ENV="${PIOENV:-supermini}"
 NO_BUILD=0
-OUT="${ROOT}/release/plane-radar-merged.bin"
+OUT="${ROOT}/release/eham-runways-merged.bin"
 
 usage() {
   cat <<'EOF'
@@ -13,7 +13,7 @@ Usage: scripts/merge-firmware.sh [options]
 
   --no-build     Skip pio run (merge only; firmware must already be built)
   --env NAME     PlatformIO env (default: supermini)
-  -o PATH        Output file (default: release/plane-radar-merged.bin)
+  -o PATH        Output file (default: release/eham-runways-merged.bin)
   -h, --help     Show this help
 EOF
 }

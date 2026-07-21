@@ -48,8 +48,8 @@ jobs:
             VERSION="manual-${GITHUB_SHA::7}"
           fi
           mkdir -p dist
-          cp .pio/build/supermini/firmware-merged.bin "dist/plane-radar-${VERSION}.bin"
-          sha256sum "dist/plane-radar-${VERSION}.bin" > "dist/plane-radar-${VERSION}.bin.sha256"
+          cp .pio/build/supermini/firmware-merged.bin "dist/eham-runways-${VERSION}.bin"
+          sha256sum "dist/eham-runways-${VERSION}.bin" > "dist/eham-runways-${VERSION}.bin.sha256"
           echo "version=${VERSION}" >> "$GITHUB_ENV"
 
       - name: Publish GitHub Release

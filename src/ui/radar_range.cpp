@@ -11,7 +11,7 @@ namespace ui::radar {
 
 namespace {
 
-constexpr char kPrefsNamespace[] = "planeradar";
+constexpr char kPrefsNamespace[] = "ehamrunways";
 constexpr char kPrefsRangeKey[] = "rangeIdx";
 constexpr char kPrefsMilesKey[] = "useMiles";
 constexpr char kPrefsRunwaysKey[] = "showRwys";
