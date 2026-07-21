@@ -212,11 +212,22 @@ void drawRunway(lgfx::LGFXBase& gfx, size_t index, const PhysicalRunwayState& rw
   drawEndLabel(gfx, pb, dir_ab, def.end_b, endLabelColor(rw.end_b));
 }
 
+void drawUnavailableBanner(lgfx::LGFXBase& gfx) {
+  ensureLabelStyle(gfx, s_end_label_style, kEndLabelHeightPx, &fonts::FreeSansBold9pt7b);
+  applyLabelStyle(gfx, s_end_label_style);
+  gfx.setTextDatum(textdatum_t::bottom_center);
+  gfx.setTextColor(schiphol::kColorWarning, schiphol::kColorBackground);
+  gfx.drawString("LIVE DATA UNAVAILABLE", kFrameSize / 2, kFrameSize - 10);
+}
+
 void renderFrame(lgfx::LGFXBase& gfx, const EhamOperationalState& state) {
   gfx.fillScreen(schiphol::kColorBackground);
   drawTitle(gfx);
   for (size_t i = 0; i < data::eham_runways::runwayCount(); ++i) {
     drawRunway(gfx, i, state.runways[i]);
+  }
+  if (!state.runway_data_available) {
+    drawUnavailableBanner(gfx);
   }
 }
 
