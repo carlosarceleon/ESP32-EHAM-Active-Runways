@@ -18,11 +18,53 @@
 > before you stop — don't append. Keep it short: status, what's next, and any
 > non-obvious lessons the plan doesn't already cover.
 
-**Status (2026-07-21):** Milestones 1-5 are done. Milestone 5 is on branch
-`milestone-5-live-runway-data`, not yet merged/PR'd against `main`. `main.cpp`
-now fetches and displays live EHAM runway usage; nothing else remains before
-Milestone 6 (KNMI config repo) / 7 (KNMI token manager + METAR) — the weather
-half of the product definition is still entirely unimplemented.
+**Status (2026-07-22):** Milestones 0-6 are done and merged. Milestone 6
+(`schiphol-display-config` repo, public manifest at
+`https://raw.githubusercontent.com/carlosarceleon/schiphol-display-config/main/knmi-token.json`)
+was merged to that repo's `main` as part of this session (PR #1 was open
+with passing CI but unmerged — merged before starting Milestone 7, since
+M7 needs the live raw-`main` URL). Milestone 7 (KNMI METAR discovery, host
+tooling only) is done on branch `milestone-7-knmi-metar-fixtures` in *this*
+repo, not yet merged/PR'd against `main`. No ESP32 firmware code changed —
+weather is still entirely unimplemented on-device.
+
+**Milestone 7 changes:** added `tools/inspect_knmi_metar.py`, which reads
+and validates the manifest, lists KNMI `metar/1.0` files, filters for an
+EHAM filename, requests its temporary download URL, downloads it, and
+extracts the embedded TAC comment. Added fixtures `knmi_file_list.json`
+(sanitized filename list), `knmi_file_url.json` (temporaryDownloadUrl
+redacted), `metar_eham.txt` (real extracted EHAM TAC line), and
+`metar_no_eham.txt` (full body of a real non-EHAM station file).
+Documented the discovered contract in `docs/external-data-contracts.md`.
+
+**Next up: Milestone 8** (KNMI token manager on-device) then **Milestone 9**
+(METAR parser + weather rendering), using the fixtures and contract from
+this milestone.
+
+**Lessons learned from Milestone 7:**
+
+- The plan's assumption of one combined multi-station ASCII bulletin is
+  wrong. The real dataset publishes one IWXXM XML file per station per
+  observation, interleaved by creation time across ~5 Dutch stations.
+  `maxKeys=1&orderBy=created&sorting=desc` will often return a non-EHAM
+  file — list a page (`maxKeys=25` covers a full rotation) and filter
+  filenames containing `EHAM` instead.
+- Despite being XML, each file embeds the classic TAC report verbatim
+  inside an XML comment (`<!-- METAR EHAM ... -->`), ahead of the full
+  IWXXM structure. Milestone 9's parser should extract that comment with a
+  simple substring/regex scan rather than parsing IWXXM XML on-device —
+  this keeps the stop-condition concern (`"not practical for direct ESP32
+  parsing"`) from applying; no proxy service or architecture change is
+  needed.
+- Each file is also a WMO GTS bulletin, not bare XML: it starts with a
+  CRCRLF-separated AHL preamble (e.g. `0000350701\r\r\nLANL80 EHAM
+  212150\r\r\n`) before `<?xml ...>` begins. The Milestone 9 parser must
+  search for the TAC comment rather than assuming the file starts with
+  `<?xml` or with the TAC itself.
+- Milestone 6's PR in the separate `schiphol-display-config` repo had
+  passed CI but sat unmerged — worth checking PR state (not just "does the
+  repo/file exist") before trusting a prior milestone is actually live and
+  fetchable at its public URL.
 
 **Milestone 5 changes:** added `services::runway` as two files —
 `runway_parser.h/.cpp` (pure `parseRunwayResponse(json, len, now_utc, out,

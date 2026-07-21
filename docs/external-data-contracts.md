@@ -102,3 +102,84 @@ See `config::kRunwayFetchIntervalMs` / `kRunwayRetryIntervalMs` /
 - `User-Agent: ESP32-Schiphol-Runway-Display/1.0`.
 - `http.end()` is always called before returning from
   `services::runway::fetchOnce`.
+
+---
+
+## KNMI METAR (Milestone 7 discovery)
+
+Discovered with `tools/inspect_knmi_metar.py` against the live KNMI Open
+Data API, using the anonymous token from the public
+`schiphol-display-config` manifest.
+
+### Endpoints used
+
+1. `GET /datasets/metar/versions/1.0/files?maxKeys=25&orderBy=created&sorting=desc`
+   — file listing, `Authorization: <token>` header.
+2. `GET /datasets/metar/versions/1.0/files/<url-encoded-filename>/url`
+   — same auth header, returns a short-lived `temporaryDownloadUrl`.
+3. `GET <temporaryDownloadUrl>` — no Authorization header (plain HTTPS,
+   signed query string).
+
+### Critical deviation from the plan's assumption
+
+The plan assumed one ASCII bulletin containing multiple stations. The real
+dataset is **one file per station per observation**, not a combined
+bulletin. `maxKeys=1&orderBy=created&sorting=desc` does **not** reliably
+return an EHAM file — reports for EHAM, EHRD, EHGG, EHLE, EHBK, and others
+are interleaved by creation time, roughly every 30 minutes per station.
+The client must list a page (`maxKeys=25` covers well over a full rotation
+of all Dutch stations) and filter filenames containing `EHAM`.
+
+### Filename pattern (stable, observed across ~100 files)
+
+```text
+A_LANL80<ICAO><DDHHMM>_C_<ICAO>_<YYMMDDHHMMSS>.xml
+```
+
+Example: `A_LANL80EHAM212150_C_EHAM_210726215016.xml`.
+
+### File body format
+
+Each file is a WMO GTS bulletin, not raw METAR text and not standalone
+XML:
+
+1. An abbreviated-heading-line (AHL) preamble, CRCRLF-separated, e.g.:
+   ```text
+   0000350701\r\r\nLANL80 EHAM 212150\r\r\n
+   ```
+2. Followed immediately by an IWXXM XML document (`<?xml version="1.0" ?>`
+   ... `<iwxxm:METAR automated=...>`).
+3. **The traditional alphanumeric code (TAC) is embedded verbatim inside
+   an XML comment** near the top of the IWXXM payload:
+   ```text
+   <!-- METAR EHAM 212155Z 34004KT 9999 FEW015 SCT026 BKN037 17/13 Q1025 NOSIG= -->
+   ```
+
+This TAC comment is the intended parsing target for Milestone 9 — trivial
+substring extraction (`<!-- METAR ` / `<!-- SPECI ` up to ` -->`), not
+IWXXM XML parsing. Observed properties:
+
+- Encoding: UTF-8/ASCII, CRLF line endings.
+- Typical file size: ~3.0–3.6 KB.
+- One report per file — no multi-report or multi-station files observed.
+- Reports start with `METAR` or `SPECI`, always followed by the 4-letter
+  ICAO station and a `DDHHMM Z` timestamp.
+- A file for a given station may legitimately contain no match for a
+  different station — this is the normal, expected "no EHAM report" case
+  when the queried file belongs to another station, not a failure.
+
+### Fixtures captured
+
+- `fixtures/knmi_file_list.json` — sanitized filename list (no other
+  metadata retained).
+- `fixtures/knmi_file_url.json` — file-url response with
+  `temporaryDownloadUrl` redacted (signed, short-lived).
+- `fixtures/metar_eham.txt` — extracted TAC line from a real EHAM file.
+- `fixtures/metar_no_eham.txt` — full body of a real non-EHAM (EHRD) file,
+  demonstrating the AHL+IWXXM wrapper and the absence of an EHAM match.
+
+### Stop condition check
+
+Not triggered. The embedded TAC comment makes on-device parsing practical
+without an IWXXM XML parser; no architecture change or proxy service is
+required.
