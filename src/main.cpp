@@ -14,6 +14,10 @@
 #include "ui/radar_range.h"
 #include "ui/status_screens.h"
 
+#if defined(EHAM_ENABLE_FIXTURES)
+#include "data/eham_runways.h"
+#endif
+
 namespace {
 
 bool g_radar_visible = false;
@@ -67,6 +71,10 @@ void setup() {
   delay(500);
   Serial.println();
   Serial.println("Plane Radar");
+
+#if defined(EHAM_ENABLE_FIXTURES)
+  data::eham_runways::runSelfTest();
+#endif
 
   bootButtonInit();
   displayInit();
