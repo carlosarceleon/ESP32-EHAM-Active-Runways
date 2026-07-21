@@ -5,3 +5,4 @@ release/
 .vscode/launch.json
 .vscode/ipch
 .serena
+graphify-out

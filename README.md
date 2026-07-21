@@ -8,7 +8,7 @@ Firmware for an **ESP32-C3 Super Mini** and a **1.28″ round GC9A01** display (
 
 ## What it does
 
-1. **Wi‑Fi setup** (if needed) — captive portal on AP **`EhamRunways-Setup`**
+1. **Wi‑Fi setup** (if needed) — captive portal on AP **`SchipholRunways-Setup`**
 2. **Runway status** — active EHAM landing/departure runways rendered on a stylized Schiphol map
 
 After Wi‑Fi is saved, the device reconnects automatically. The current milestone renders the EHAM runway screen from fixed/fixture data; live runway and weather fetching land in later milestones (see `docs/agent-instructions/ESP32_Schiphol_Runway_Display_Implementation_Plan.md`).
@@ -17,8 +17,8 @@ After Wi‑Fi is saved, the device reconnects automatically. The current milesto
 
 | Action | Effect |
 |--------|--------|
-| **Short tap** | Test builds only (`supermini_eham_selftest`): cycle EHAM fixture states |
-| **Hold 3 s** | Clear Wi‑Fi, location, and units; reboot into setup portal |
+| **Short tap** | Test builds (`supermini_eham_selftest`): cycle EHAM fixture states. Normal builds: force an immediate runway/weather refresh |
+| **Hold 3 s** | Clear Wi‑Fi; reboot into setup portal |
 
 During setup you can also hold BOOT at power-on to force a credential reset (same as the long press).
 
@@ -26,24 +26,16 @@ During setup you can also hold BOOT at power-on to force a credential reset (sam
 
 **First-time setup** (no saved Wi‑Fi):
 
-1. Connect to **`EhamRunways-Setup`**
-2. Open **`http://eham-runways.local`** (preferred) or **`http://192.168.4.1`** — both are shown on the yellow setup screen; captive portal may open automatically
+1. Connect to **`SchipholRunways-Setup`**
+2. Open **`http://schiphol-runways.local`** (preferred) or **`http://192.168.4.1`** — both are shown on the setup screen; captive portal may open automatically
 3. Set home Wi‑Fi, then save
 
 **Reconfigure anytime** (after the device is on your network):
 
-1. Open **`http://eham-runways.local`** or **`http://<device-ip>`** (e.g. from your router or serial log at boot)
-2. Change Wi‑Fi, location, units, or runway overlay; save
+1. Open **`http://schiphol-runways.local`** or **`http://<device-ip>`** (e.g. from your router or serial log at boot)
+2. Change Wi‑Fi; save
 
-The same portal runs on the setup AP and on the device’s LAN IP while connected to Wi‑Fi. mDNS hostname is `eham-runways` → **eham-runways.local** (`kPortalHostname` in `config.h`). Some clients resolve `.local` slowly; use the IP if needed.
-
-**Custom fields** (stored in NVS):
-
-| Field | Purpose |
-|-------|---------|
-| **Latitude / Longitude** | Radar center and ADS-B query position (defaults in `config.h` until set) |
-| **Display distances in miles** | Ring scale label in **mi** instead of **km** (e.g. `6mi` vs `10km`) |
-| **Show airport runways** | Major-airport runway overlay on the radar (off to hide) |
+The same portal runs on the setup AP and on the device’s LAN IP while connected to Wi‑Fi. mDNS hostname is `schiphol-runways` → **schiphol-runways.local** (`kPortalHostname` in `config.h`). Some clients resolve `.local` slowly; use the IP if needed. Only Wi‑Fi setup is exposed in the portal — there are no radar-specific fields.
 
 After a reset, the device reboots and shows the setup screen immediately (no “Connecting” loop on stale credentials).
 
