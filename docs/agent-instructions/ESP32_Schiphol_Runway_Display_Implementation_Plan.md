@@ -18,18 +18,36 @@
 > before you stop — don't append. Keep it short: status, what's next, and any
 > non-obvious lessons the plan doesn't already cover.
 
-**Status (2026-07-21):** Milestones 1 and 2 are done, each on its own branch
-merged/PR'd against `main` (`milestone-1-eham-domain-model`,
-`milestone-2-schiphol-static-screen`). `main.cpp` now renders the static EHAM
-runway screen (all-inactive state, or fixture-cycling under
-`EHAM_ENABLE_FIXTURES`) instead of the old radar UI. The old radar/ADS-B
-source files are untouched and still compile, just unused from `main()`.
+**Status (2026-07-21):** Milestones 1, 2, and 3 are done. Milestone 3 is on
+branch `milestone-3-implementation`, not yet merged/PR'd against `main`.
+`main.cpp` still renders the static EHAM runway screen (all-inactive state,
+or fixture-cycling under `EHAM_ENABLE_FIXTURES`); the old radar/ADS-B source
+files are untouched and still compile, just unused from `main()`.
 
-**Next up: Milestone 3** (simplify setup and button behavior). Note it
-renames the AP/hostname again to `SchipholRunways-Setup` /
-`schiphol-runways` — Milestone 2 used `EhamRunways-Setup` / `eham-runways`
-as an interim name (see lesson below); Milestone 3 supersedes it, so just
-follow the plan's literal strings rather than trying to reconcile the two.
+**Milestone 3 changes:** renamed AP/hostname to `SchipholRunways-Setup` /
+`schiphol-runways` (superseding Milestone 2's interim `EhamRunways-Setup` /
+`eham-runways`). Removed the Latitude/Longitude/miles/runway-overlay
+WiFiManager portal fields and their save/reset plumbing from
+`wifi_setup.cpp` (the portal now only has Wi‑Fi credentials). Dropped the
+now-unnecessary `services::location::init()` / `ui::radar::rangeInit()`
+calls from `main.cpp` — those services/headers still exist untouched (M10
+deletes them), just no longer referenced. BOOT short tap in normal
+(non-fixture) builds now logs a force-refresh event to serial instead of
+doing nothing (actual refresh logic lands in Milestone 5). Status screens
+(`status_screens.cpp`) are rebranded to the Schiphol palette via
+`ui::schiphol` colors instead of the old black/yellow scheme; `main.cpp`
+calls `ui::schiphol::initPalette()` right after `displayInit()` so those
+colors are ready before any status screen draws (the EHAM display code
+already called `initPalette()` itself for its own draws). README updated to
+match.
+
+**Next up: Milestone 4** (NTP and robust timestamp parsing).
+
+**Lessons learned from Milestone 3:**
+
+- `wifi_setup.cpp` no longer needs `services/radar_location.h` or
+  `ui/radar_range.h` at all — those were only pulled in for the portal
+  fields removed this milestone.
 
 **Lessons learned:**
 

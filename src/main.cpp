@@ -9,10 +9,9 @@
 #include "config.h"
 #include "domain/eham_state.h"
 #include "hardware/display.h"
-#include "services/radar_location.h"
 #include "services/wifi_setup.h"
 #include "ui/eham_display.h"
-#include "ui/radar_range.h"
+#include "ui/schiphol_theme.h"
 #include "ui/status_screens.h"
 
 #if defined(EHAM_ENABLE_FIXTURES)
@@ -72,6 +71,8 @@ void handleBootButton() {
   if (bootButtonConsumeTap()) {
 #if defined(EHAM_ENABLE_FIXTURES)
     onBootTap();
+#else
+    Serial.println("BOOT tap — force refresh requested");
 #endif
   }
 }
@@ -82,10 +83,11 @@ void setup() {
   Serial.begin(115200);
   delay(500);
   Serial.println();
-  Serial.println("EHAM Active Runways");
+  Serial.println("Schiphol Runway Display");
 
   bootButtonInit();
   displayInit();
+  ui::schiphol::initPalette();
 
 #if defined(EHAM_ENABLE_FIXTURES)
   data::eham_runways::runSelfTest();
@@ -94,8 +96,6 @@ void setup() {
   if (wifiShowsSetupScreenOnBoot()) {
     statusScreenPortal();
   }
-  services::location::init();
-  ui::radar::rangeInit();
 
   if (wifiSetupConnect()) {
     showEhamScreenIfConnected();

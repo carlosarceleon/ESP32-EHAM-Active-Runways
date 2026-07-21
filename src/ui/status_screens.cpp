@@ -10,6 +10,7 @@
 #include "config.h"
 #include "hardware/display.h"
 #include "hardware/display_font.h"
+#include "ui/schiphol_theme.h"
 
 namespace {
 
@@ -127,10 +128,10 @@ void fitSsidLine() {
 }
 
 void drawConnectingText() {
-  tft.fillScreen(config::kColorBlack);
+  tft.fillScreen(ui::schiphol::kColorBackground);
 
   tft.setTextDatum(textdatum_t::middle_center);
-  tft.setTextColor(config::kTextOnBlack, config::kColorBlack);
+  tft.setTextColor(ui::schiphol::kColorTitle, ui::schiphol::kColorBackground);
 
   applyConnectingDetailStyle();
   const int detail_h = tft.fontHeight();
@@ -138,7 +139,7 @@ void drawConnectingText() {
   const int block_top = (config::kDisplayHeight - total_h) / 2;
   constexpr int kPanelPadY = 8;
   tft.fillRect(kCenterX - kConnectingTextMaxWidthPx / 2, block_top - kPanelPadY,
-               kConnectingTextMaxWidthPx, total_h + kPanelPadY * 2, config::kColorBlack);
+               kConnectingTextMaxWidthPx, total_h + kPanelPadY * 2, ui::schiphol::kColorBackground);
 
   int y = block_top;
   tft.drawString("Connecting to", kCenterX, y + detail_h / 2);
@@ -154,7 +155,7 @@ void eraseSpinnerDots() {
       continue;
     }
     tft.fillCircle(s_spinner_dots[i].x, s_spinner_dots[i].y, kSpinnerEraseRadius,
-                   config::kColorBlack);
+                   ui::schiphol::kColorBackground);
     s_spinner_dots[i].drawn = false;
   }
 }
@@ -215,7 +216,7 @@ void statusScreenPortal() {
       {config::kPortalHostUrl, 1.12f, &kPortalGfxEmphasis},
       {"or 192.168.4.1", 1.0f, &kPortalGfxBody},
   };
-  drawTextBlock(config::kColorYellow, config::kTextOnYellow, lines,
+  drawTextBlock(ui::schiphol::kColorBackground, ui::schiphol::kColorTitle, lines,
                 sizeof(lines) / sizeof(lines[0]));
 }
 
@@ -227,7 +228,7 @@ void statusScreenConnectFailed() {
       {"Hold BOOT 3 sec", 1.0f, &kGfxBody},
       {"to reset Wi-Fi", 1.0f, &kGfxBody},
   };
-  drawTextBlock(config::kColorYellow, config::kTextOnYellow, lines,
+  drawTextBlock(ui::schiphol::kColorBackground, ui::schiphol::kColorWarning, lines,
                 sizeof(lines) / sizeof(lines[0]));
 }
 
@@ -236,6 +237,6 @@ void statusScreenWifiReset() {
       {"Wi-Fi reset", 1.15f, &kPortalGfxTitle},
       {"Restarting...", 1.05f, &kPortalGfxBody},
   };
-  drawTextBlock(config::kColorYellow, config::kTextOnYellow, lines,
+  drawTextBlock(ui::schiphol::kColorBackground, ui::schiphol::kColorTitle, lines,
                 sizeof(lines) / sizeof(lines[0]));
 }
