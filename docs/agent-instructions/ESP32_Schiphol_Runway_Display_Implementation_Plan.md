@@ -18,30 +18,50 @@
 > before you stop — don't append. Keep it short: status, what's next, and any
 > non-obvious lessons the plan doesn't already cover.
 
-**Status (2026-07-21):** Milestones 1, 2, and 3 are done. Milestone 3 is on
-branch `milestone-3-implementation`, not yet merged/PR'd against `main`.
-`main.cpp` still renders the static EHAM runway screen (all-inactive state,
-or fixture-cycling under `EHAM_ENABLE_FIXTURES`); the old radar/ADS-B source
-files are untouched and still compile, just unused from `main()`.
+**Status (2026-07-21):** Milestones 1-4 are done. Milestone 4 is on branch
+`milestone-4-clock-sync`, not yet merged/PR'd against `main`. `main.cpp`
+still renders the static EHAM runway screen (all-inactive state, or
+fixture-cycling under `EHAM_ENABLE_FIXTURES`) — live runway data still lands
+in Milestone 5. The clock is wired up but nothing consumes it yet (no
+"last updated" timestamp on screen — that's later UI work).
 
-**Milestone 3 changes:** renamed AP/hostname to `SchipholRunways-Setup` /
-`schiphol-runways` (superseding Milestone 2's interim `EhamRunways-Setup` /
-`eham-runways`). Removed the Latitude/Longitude/miles/runway-overlay
-WiFiManager portal fields and their save/reset plumbing from
-`wifi_setup.cpp` (the portal now only has Wi‑Fi credentials). Dropped the
-now-unnecessary `services::location::init()` / `ui::radar::rangeInit()`
-calls from `main.cpp` — those services/headers still exist untouched (M10
-deletes them), just no longer referenced. BOOT short tap in normal
-(non-fixture) builds now logs a force-refresh event to serial instead of
-doing nothing (actual refresh logic lands in Milestone 5). Status screens
-(`status_screens.cpp`) are rebranded to the Schiphol palette via
-`ui::schiphol` colors instead of the old black/yellow scheme; `main.cpp`
-calls `ui::schiphol::initPalette()` right after `displayInit()` so those
-colors are ready before any status screen draws (the EHAM display code
-already called `initPalette()` itself for its own draws). README updated to
-match.
+**Milestone 4 changes:** added `services::clock` (`include/services/clock_service.h`,
+`src/services/clock_service.cpp`) with `beginClockSync()` /
+`clockLoop()` / `clockIsValid()` / `nowUtc()` / `formatLocalDate()` /
+`formatLocalTime()` / `parseIso8601ToUtc()`. `main.cpp` calls
+`beginClockSync()` right after a successful `wifiSetupConnect()`, and
+`clockLoop()` every non-fixture `loop()` iteration. Timezone handling uses
+the POSIX TZ string `CET-1CEST,M3.5.0,M10.5.0/3` via `configTzTime()` — no
+manual DST math needed, the libc TZ machinery does it. `parseIso8601ToUtc()`
+is a dependency-free pure function (Howard Hinnant's `daysFromCivil`
+algorithm for the UTC day count) so it doesn't rely on `timegm()` (not
+available in this toolchain) or on the system TZ being anything in
+particular. Added `fixtures/timestamps.txt` (human-readable ISO-8601 test
+vectors) and `tools/validate_fixtures.py` (independently cross-checks that
+file against Python's stdlib parser — doesn't touch device code). The
+on-device self-test (`runClockSelfTest()`, gated by `EHAM_ENABLE_FIXTURES`
+like the existing `data::eham_runways::runSelfTest()`) hardcodes the same
+vectors as `fixtures/timestamps.txt` — there's no on-device file reading, so
+the two are kept in sync by hand; a comment in each points at the other.
 
-**Next up: Milestone 4** (NTP and robust timestamp parsing).
+**Next up: Milestone 5** (implement and integrate live runway data).
+
+**Lessons learned from Milestone 4:**
+
+- This toolchain (GCC 8.4 / ESP32-C3) does not provide `timegm()`. Don't
+  reach for it for UTC-safe epoch conversion — implement the day-count
+  math directly (see `daysFromCivil` in `clock_service.cpp`) instead of
+  fighting `mktime`/TZ environment state.
+- `configTzTime(tz, ntp1, ntp2)` is fire-and-forget; there's no callback for
+  "sync done" by default. Polling `time(nullptr) >= <plausible epoch>` in
+  `clockLoop()` each iteration is simpler than wiring
+  `sntp_set_time_sync_notification_cb` and works fine given the 10ms loop
+  delay already in `main.cpp`.
+- Cross-checking fixture expectations with an independent implementation
+  (here, `tools/validate_fixtures.py` against Python's `datetime`) caught a
+  hand-computed epoch mistake in the CEST test vector before it ever reached
+  hardware — worth doing again for any future milestone with hand-derived
+  numeric expected values.
 
 **Lessons learned from Milestone 3:**
 
