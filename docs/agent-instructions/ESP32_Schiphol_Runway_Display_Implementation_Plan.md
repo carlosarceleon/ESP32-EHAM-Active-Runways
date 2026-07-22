@@ -18,28 +18,40 @@
 > before you stop — don't append. Keep it short: status, what's next, and any
 > non-obvious lessons the plan doesn't already cover.
 
-**Status (2026-07-22):** Milestones 0-6 are done and merged. Milestone 6
-(`schiphol-display-config` repo, public manifest at
-`https://raw.githubusercontent.com/carlosarceleon/schiphol-display-config/main/knmi-token.json`)
-was merged to that repo's `main` as part of this session (PR #1 was open
-with passing CI but unmerged — merged before starting Milestone 7, since
-M7 needs the live raw-`main` URL). Milestone 7 (KNMI METAR discovery, host
-tooling only) is done on branch `milestone-7-knmi-metar-fixtures` in *this*
-repo, not yet merged/PR'd against `main`. No ESP32 firmware code changed —
-weather is still entirely unimplemented on-device.
+**Status (2026-07-22):** Milestones 0-8 are done and merged to `main` (PR #7
+for Milestone 8). Weather is still entirely unrendered on-device — Milestone
+8 only manages the KNMI token in the background; nothing consumes it yet.
 
-**Milestone 7 changes:** added `tools/inspect_knmi_metar.py`, which reads
-and validates the manifest, lists KNMI `metar/1.0` files, filters for an
-EHAM filename, requests its temporary download URL, downloads it, and
-extracts the embedded TAC comment. Added fixtures `knmi_file_list.json`
-(sanitized filename list), `knmi_file_url.json` (temporaryDownloadUrl
-redacted), `metar_eham.txt` (real extracted EHAM TAC line), and
-`metar_no_eham.txt` (full body of a real non-EHAM station file).
-Documented the discovered contract in `docs/external-data-contracts.md`.
+**Milestone 8 changes:** added `services::knmi_token`
+(`knmi_token_manager.h/.cpp`). `knmiTokenInit()` loads any cached
+token+`valid_until` from NVS (namespace `knmi`). `knmiTokenLoop()` (called
+every connected `loop()` iteration) downloads the Milestone 6 manifest,
+validates `schema_version`/`provider`/token charset+length/`valid_from`..`valid_until`
+against today's local date (plain `strcmp` on fixed-width ISO date strings —
+no date-parsing needed), then double-checks the candidate token against
+KNMI's own file list (`maxKeys=1`) before trusting it; only a token that
+passes both checks is written to NVS. Refresh cadence is daily once a token
+has ever verified, else every 5 minutes; `knmiTokenForceRefresh()` is
+exposed for Milestone 9's 401/403 handling. Manifest/KNMI outages silently
+keep the last verified cached token — nothing changes on-screen or in the
+portal either way. Added `docs/maintenance.md` documenting the token-rotation
+runbook against the separate config repo.
 
-**Next up: Milestone 8** (KNMI token manager on-device) then **Milestone 9**
-(METAR parser + weather rendering), using the fixtures and contract from
-this milestone.
+**Next up: Milestone 9** (METAR parser + weather rendering), using the
+fixtures and contract from Milestone 7 and `services::knmi_token::knmiToken()`
+from Milestone 8.
+
+**Lessons learned from Milestone 8:**
+
+- ISO `YYYY-MM-DD` strings compare correctly with plain `strcmp` for
+  chronological ordering — no need to parse dates into `struct tm` just to
+  check `valid_from <= today <= valid_until`. Keep this in mind for
+  Milestone 9's METAR observation-time handling too, though month-boundary
+  inference there is genuinely more complex than a single range check.
+- Validating a manifest's *shape* is not the same as validating that KNMI
+  *accepts* the token in it — a manifest can be well-formed JSON with a
+  since-revoked token. The lightweight `maxKeys=1` file-list request is
+  cheap enough to do on every refresh as a second, independent check.
 
 **Lessons learned from Milestone 7:**
 
