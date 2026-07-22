@@ -18,9 +18,84 @@
 > before you stop — don't append. Keep it short: status, what's next, and any
 > non-obvious lessons the plan doesn't already cover.
 
-**Status (2026-07-22):** Milestones 0-8 are done and merged to `main` (PR #7
-for Milestone 8). Weather is still entirely unrendered on-device — Milestone
-8 only manages the KNMI token in the background; nothing consumes it yet.
+### IMPORTANT: Development cycle
+
+You'll be asked to read the handover and continue with a development step milestone.
+
+Always create a new branch for this, make all the changes, commit often.
+
+At the end of all of your changes, push, monitor CI runs and if everything is ok, merge to main.
+
+If you have any strong concerns consult with the human.
+
+**Status (2026-07-22):** Milestones 0-9 are done. Milestone 9 (this session)
+is on branch `milestone-9-metar-weather`, not yet merged — see the PR-status
+note at the end of this handover before assuming it's live on `main`.
+
+**Milestone 9 changes:** added `services::metar` (`metar_parser.h/.cpp`) and
+`services::metar_client` (`knmi_metar_client.h/.cpp`).
+
+- `services::metar::extractTacComment()` pulls the first `<!-- METAR ... -->`
+  / `<!-- SPECI ... -->` comment out of a raw KNMI file body;
+  `parseTacLine()` parses that bare TAC line (station must be `EHAM`, else
+  `NoEhamReport`), inferring the observation month by trying the current
+  month and its neighbors against a supplied `now_utc`, and rejecting
+  anything older than 90 minutes (`ParseResult::Stale`). Handles standard/
+  gust/`VRB`-variable/trailing-`dddVddd`-variable/calm wind and signed
+  temperature. `parseKnmiMetarFile()` composes extraction + parsing.
+- `services::metar_client::metarLoop()` implements the list -> file-url ->
+  anonymous-download workflow (`config::kKnmiApiBase`), using
+  `services::knmi_token::knmiToken()` as the bearer token for the first two
+  requests only -- never forwarded to the temporary signed download URL. On
+  401/403 it forces a token refresh (`knmiTokenForceRefresh()` +
+  `knmiTokenLoop()`) and retries the whole workflow once; any other failure
+  ends the cycle with weather left unavailable. Weather is explicitly marked
+  unavailable at the start of every cycle and only marked available again
+  after a full parse success. 30-minute schedule plus a fixed per-device
+  jitter derived from `ESP.getEfuseMac()`.
+- `main.cpp` now composes `services::runway::currentState()` +
+  `services::metar_client::currentWeather()` into the state handed to
+  `ui::ehamDisplayDraw()`, and redraws on either service's change flag.
+  `ui::eham_display` draws a compact weather row (e.g. `250V 18G32KT  14C`)
+  in the same bottom-banner slot as "LIVE DATA UNAVAILABLE" -- only one of
+  the two is ever shown, and only when runway data is available (weather
+  is skipped, not stacked, when runway data is down).
+- Added `docs/agent-instructions/...` (this doc) update plus a new
+  `## KNMI METAR parsing and rendering (Milestone 9)` section in
+  `docs/external-data-contracts.md`. Added fixtures
+  `metar_eham_gust.txt` / `metar_eham_variable.txt` / `metar_eham_calm.txt`
+  (bare TAC lines, same convention as the existing `metar_eham.txt`).
+  `runMetarParserSelfTest()` (gated by `EHAM_ENABLE_FIXTURES`, called from
+  `main.cpp`) hardcodes vectors mirroring all of these plus a month-boundary
+  and a stale-report case.
+
+**Next up: Milestone 10** (remove radar code, harden, document, release).
+
+**Lessons learned from Milestone 9:**
+
+- `EhamWeather` already existed in `domain/eham_state.h` from an earlier
+  milestone -- no domain-model change was needed, only the two new services
+  and the display/main wiring.
+- The real fixtures (`metar_eham.txt`, `metar_no_eham.txt`) are enough to
+  prove the extraction-from-wrapped-body and wrong-station paths
+  end-to-end; the parser-level cases (gust/variable/calm/stale/month-
+  boundary/malformed) are exercised against synthetic bare TAC lines instead
+  since capturing a real gusty/calm/negative-temperature EHAM report on
+  demand isn't practical.
+- Runway and weather are two fully independent services with their own
+  scheduling, HTTP calls, and change flags; `main.cpp` only combines them at
+  the point of drawing. This keeps the "weather never blocks runway
+  scheduling" acceptance criterion trivially true rather than something to
+  defend against.
+- Both `pio run -e supermini` and `-e supermini_eham_selftest` build clean
+  after these changes -- no on-device/hardware run was performed this
+  session (no physical board attached); verify visually before relying on
+  the weather-row layout description above.
+
+**PR status:** not yet pushed/opened as of writing this handover -- follow
+the "IMPORTANT: Development cycle" note at the top of this document (push,
+monitor CI, merge to `main`) before starting Milestone 10, or check
+`gh pr list` / `git log origin/main` first if you're picking this up cold.
 
 **Milestone 8 changes:** added `services::knmi_token`
 (`knmi_token_manager.h/.cpp`). `knmiTokenInit()` loads any cached

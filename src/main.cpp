@@ -10,7 +10,9 @@
 #include "domain/eham_state.h"
 #include "hardware/display.h"
 #include "services/clock_service.h"
+#include "services/knmi_metar_client.h"
 #include "services/knmi_token_manager.h"
+#include "services/metar_parser.h"
 #include "services/runway_client.h"
 #include "services/runway_parser.h"
 #include "services/wifi_setup.h"
@@ -57,12 +59,18 @@ bool g_screen_visible = false;
 unsigned long g_wifi_down_since = 0;
 unsigned long g_last_reconnect_ms = 0;
 
+EhamOperationalState composeDisplayState() {
+  EhamOperationalState state = services::runway::currentState();
+  state.weather = services::metar_client::currentWeather();
+  return state;
+}
+
 void showEhamScreenIfConnected() {
   if (WiFi.status() != WL_CONNECTED) {
     g_screen_visible = false;
     return;
   }
-  ui::ehamDisplayDraw(services::runway::currentState());
+  ui::ehamDisplayDraw(composeDisplayState());
   g_screen_visible = true;
 }
 
@@ -97,6 +105,7 @@ void setup() {
   data::eham_runways::runSelfTest();
   services::clock::runClockSelfTest();
   services::runway::runParserSelfTest();
+  services::metar::runMetarParserSelfTest();
   drawCurrentFixture();
 #else
   if (wifiShowsSetupScreenOnBoot()) {
@@ -143,10 +152,14 @@ void loop() {
     }
 
     services::runway::runwayLoop();
-    if (services::runway::consumeStateChanged() && g_screen_visible) {
-      ui::ehamDisplayDraw(services::runway::currentState());
-    }
     services::knmi_token::knmiTokenLoop();
+    services::metar_client::metarLoop();
+
+    const bool runway_changed = services::runway::consumeStateChanged();
+    const bool weather_changed = services::metar_client::consumeWeatherChanged();
+    if ((runway_changed || weather_changed) && g_screen_visible) {
+      ui::ehamDisplayDraw(composeDisplayState());
+    }
   }
 #endif
 

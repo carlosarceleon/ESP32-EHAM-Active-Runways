@@ -39,6 +39,7 @@ extern uint16_t kColorLandingLabel;
 extern uint16_t kColorDeparture;
 extern uint16_t kColorDepartureLabel;
 extern uint16_t kColorWarning;
+extern uint16_t kColorWeather;
 
 /**
  * Single RGB888 -> panel RGB565 conversion point for the Schiphol theme.

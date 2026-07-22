@@ -177,9 +177,77 @@ IWXXM XML parsing. Observed properties:
 - `fixtures/metar_eham.txt` — extracted TAC line from a real EHAM file.
 - `fixtures/metar_no_eham.txt` — full body of a real non-EHAM (EHRD) file,
   demonstrating the AHL+IWXXM wrapper and the absence of an EHAM match.
+- `fixtures/metar_eham_gust.txt`, `fixtures/metar_eham_variable.txt`,
+  `fixtures/metar_eham_calm.txt` — hand-built bare TAC lines (Milestone 9)
+  covering gust wind, `VRB` variable wind, and calm (`00000KT`) wind.
 
 ### Stop condition check
 
 Not triggered. The embedded TAC comment makes on-device parsing practical
 without an IWXXM XML parser; no architecture change or proxy service is
 required.
+
+---
+
+## KNMI METAR parsing and rendering (Milestone 9)
+
+`services::metar` (`src/services/metar_parser.cpp`) implements two layers:
+
+1. `extractTacComment()` — scans a raw KNMI file body for the first
+   `<!-- METAR ... -->` / `<!-- SPECI ... -->` comment, collapsing internal
+   whitespace/newlines into single spaces. Returns false if no such comment
+   exists at all (distinct from "comment present but wrong station").
+2. `parseTacLine()` — parses a bare TAC line: requires station `EHAM`
+   (anything else is `ParseResult::NoEhamReport`, not an error), infers the
+   observation month against a supplied `now_utc` by trying the current
+   month and its immediate neighbors (so a report published just before/after
+   a month boundary still resolves correctly), and rejects anything older
+   than `kMaxReportAgeSec` (90 minutes) via `ParseResult::Stale`.
+
+`parseKnmiMetarFile()` composes both steps over a raw downloaded file body.
+
+### Wind/temperature grammar handled
+
+- Standard `dddssKT` and gust `dddssGggKT`.
+- Variable wind: either the `VRBssKT` form, or a trailing `dddVddd` group
+  after a standard directional wind group.
+- Calm wind: `00000KT`.
+- Temperature/dewpoint group `TT/TT` with an optional `M` (negative) prefix
+  on either side; only the temperature side is retained.
+
+### `services::metar_client` (`src/services/knmi_metar_client.cpp`)
+
+Implements the list -> file-url -> download workflow against
+`config::kKnmiApiBase`, reusing `services::knmi_token` for the bearer token:
+
+1. `GET /datasets/metar/versions/1.0/files?maxKeys=25&orderBy=created&sorting=desc`
+   with `Authorization: <token>`, filtered client-side for the first
+   filename containing `EHAM` (most recent, since the list is already
+   `sorting=desc`).
+2. `GET /datasets/metar/versions/1.0/files/<url-encoded-filename>/url` with
+   the same `Authorization` header, extracting `temporaryDownloadUrl`.
+3. `GET <temporaryDownloadUrl>` — **no** `Authorization` header; this is an
+   unrelated, short-lived signed-URL host.
+
+On a 401/403 from either of the first two (authenticated) requests, the
+client calls `services::knmi_token::knmiTokenForceRefresh()` +
+`knmiTokenLoop()` and retries the complete workflow exactly once with
+whatever token results. Any other failure (network, non-200, malformed
+JSON, no EHAM filename in the listing, parser rejection) ends the cycle
+silently — weather stays unavailable, and runway fetch scheduling is
+untouched either way, since the two services share no state or blocking
+calls beyond their own HTTP requests.
+
+At the start of every refresh cycle, weather is marked unavailable; it is
+only marked available again once the whole workflow *and* the parse
+succeed (`ParseResult::Ok`). Refresh cadence is 30 minutes plus a fixed
+per-device jitter (`ESP.getEfuseMac() % kKnmiMetarJitterRangeMs`), so
+identically-scheduled devices don't all poll KNMI at once.
+
+### Rendering
+
+`ui::eham_display` draws the compact weather row (wind + temperature, e.g.
+`250V 18G32KT  14C`) only when `state.weather.available` — and only when
+`state.runway_data_available`, since both currently share the same bottom
+banner slot as the "LIVE DATA UNAVAILABLE" message. No placeholder is drawn
+when weather is unavailable.
