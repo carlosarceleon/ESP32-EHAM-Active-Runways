@@ -3,6 +3,7 @@
 #include <lgfx/v1/lgfx_fonts.hpp>
 
 #include <cmath>
+#include <cstdio>
 
 #include "data/eham_runways.h"
 #include "hardware/display.h"
@@ -220,6 +221,35 @@ void drawUnavailableBanner(lgfx::LGFXBase& gfx) {
   gfx.drawString("LIVE DATA UNAVAILABLE", kFrameSize / 2, kFrameSize - 10);
 }
 
+void formatWeatherLine(const EhamWeather& weather, char* out, size_t out_len) {
+  char wind[32];
+  if (weather.calm_wind) {
+    snprintf(wind, sizeof(wind), "CALM");
+  } else if (weather.variable_wind && weather.wind_direction_deg == 0) {
+    snprintf(wind, sizeof(wind), "VRB %uKT", weather.wind_speed_kt);
+  } else {
+    char gust[8] = "";
+    if (weather.has_gust) {
+      snprintf(gust, sizeof(gust), "G%u", weather.gust_speed_kt);
+    }
+    snprintf(wind, sizeof(wind), "%03u%s %u%sKT", weather.wind_direction_deg,
+             weather.variable_wind ? "V" : "", weather.wind_speed_kt, gust);
+  }
+  snprintf(out, out_len, "%s  %dC", wind, weather.temperature_c);
+}
+
+/** Compact official EHAM weather row -- only ever called when weather.available. */
+void drawWeatherRow(lgfx::LGFXBase& gfx, const EhamWeather& weather) {
+  char line[48];
+  formatWeatherLine(weather, line, sizeof(line));
+
+  ensureLabelStyle(gfx, s_end_label_style, kEndLabelHeightPx, &fonts::FreeSansBold9pt7b);
+  applyLabelStyle(gfx, s_end_label_style);
+  gfx.setTextDatum(textdatum_t::bottom_center);
+  gfx.setTextColor(schiphol::kColorWeather, schiphol::kColorBackground);
+  gfx.drawString(line, kFrameSize / 2, kFrameSize - 10);
+}
+
 void renderFrame(lgfx::LGFXBase& gfx, const EhamOperationalState& state) {
   gfx.fillScreen(schiphol::kColorBackground);
   drawTitle(gfx);
@@ -228,6 +258,8 @@ void renderFrame(lgfx::LGFXBase& gfx, const EhamOperationalState& state) {
   }
   if (!state.runway_data_available) {
     drawUnavailableBanner(gfx);
+  } else if (state.weather.available) {
+    drawWeatherRow(gfx, state.weather);
   }
 }
 

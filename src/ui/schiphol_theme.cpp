@@ -17,6 +17,7 @@ uint16_t kColorLandingLabel = 0xFFFF;
 uint16_t kColorDeparture = 0x0000;
 uint16_t kColorDepartureLabel = 0x0000;
 uint16_t kColorWarning = 0x0000;
+uint16_t kColorWeather = 0xFFFF;
 
 uint16_t toPanelColor(uint8_t r, uint8_t g, uint8_t b) {
   return tft.color565(b, g, r);
@@ -36,6 +37,7 @@ void initPalette() {
   kColorDeparture = toPanelColor(kOrangeStrandR, kOrangeStrandG, kOrangeStrandB);
   kColorDepartureLabel = kColorDeparture;
   kColorWarning = toPanelColor(kGoldenDuneR, kGoldenDuneG, kGoldenDuneB);
+  kColorWeather = toPanelColor(kSkyBlissLighterR, kSkyBlissLighterG, kSkyBlissLighterB);
 }
 
 #if defined(EHAM_ENABLE_FIXTURES)

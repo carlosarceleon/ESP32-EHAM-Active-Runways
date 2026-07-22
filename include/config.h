@@ -83,6 +83,20 @@ constexpr unsigned long kKnmiTokenRefreshIntervalMs = 24UL * 60 * 60 * 1000;
 /** Faster retry cadence until the first token is ever verified (or after a forced refresh keeps failing). */
 constexpr unsigned long kKnmiTokenRetryIntervalMs = 5UL * 60 * 1000;
 
+// --- KNMI METAR (weather row) ---
+/** Lists the most recently created files across all stations; filtered client-side for "EHAM". */
+constexpr char kKnmiMetarFileListPath[] =
+    "/datasets/metar/versions/1.0/files?maxKeys=25&orderBy=created&sorting=desc";
+constexpr char kKnmiMetarFileUrlPathPrefix[] = "/datasets/metar/versions/1.0/files/";
+constexpr char kKnmiMetarFileUrlPathSuffix[] = "/url";
+constexpr size_t kKnmiMetarListMaxBytes = 16 * 1024;
+constexpr size_t kKnmiMetarUrlMaxBytes = 2 * 1024;
+/** Observed file size is ~3.0-3.6 KB; leaves headroom without risking the 64 KiB display buffer budget. */
+constexpr size_t kKnmiMetarFileMaxBytes = 8 * 1024;
+constexpr unsigned long kKnmiMetarFetchIntervalMs = 30UL * 60 * 1000;
+/** Deterministic per-device spread so devices don't all poll KNMI at the same instant. */
+constexpr unsigned long kKnmiMetarJitterRangeMs = 5UL * 60 * 1000;
+
 // --- UI colors (RGB565) — status screens ---
 constexpr uint16_t kColorBlack = 0x0000;
 constexpr uint16_t kColorYellow = 0xFFE0;
