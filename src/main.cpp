@@ -10,6 +10,7 @@
 #include "domain/eham_state.h"
 #include "hardware/display.h"
 #include "services/clock_service.h"
+#include "services/knmi_token_manager.h"
 #include "services/runway_client.h"
 #include "services/runway_parser.h"
 #include "services/wifi_setup.h"
@@ -90,6 +91,7 @@ void setup() {
   bootButtonInit();
   displayInit();
   ui::schiphol::initPalette();
+  services::knmi_token::knmiTokenInit();
 
 #if defined(EHAM_ENABLE_FIXTURES)
   data::eham_runways::runSelfTest();
@@ -144,6 +146,7 @@ void loop() {
     if (services::runway::consumeStateChanged() && g_screen_visible) {
       ui::ehamDisplayDraw(services::runway::currentState());
     }
+    services::knmi_token::knmiTokenLoop();
   }
 #endif
 
