@@ -94,8 +94,8 @@ constexpr size_t kKnmiMetarUrlMaxBytes = 2 * 1024;
 /** Observed file size is ~3.0-3.6 KB; leaves headroom without risking the 64 KiB display buffer budget. */
 constexpr size_t kKnmiMetarFileMaxBytes = 8 * 1024;
 constexpr unsigned long kKnmiMetarFetchIntervalMs = 30UL * 60 * 1000;
-/** Deterministic per-device spread so devices don't all poll KNMI at the same instant. */
-constexpr unsigned long kKnmiMetarJitterRangeMs = 5UL * 60 * 1000;
+/** Deterministic 0-120s per-device spread so devices don't all poll KNMI at the same instant. */
+constexpr unsigned long kKnmiMetarJitterRangeMs = 120UL * 1000;
 
 // --- UI colors (RGB565) — status screens ---
 constexpr uint16_t kColorBlack = 0x0000;

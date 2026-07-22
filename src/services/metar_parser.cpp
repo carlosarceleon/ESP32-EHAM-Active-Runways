@@ -26,6 +26,9 @@ int atoiN(const char* s, size_t len) {
   return v;
 }
 
+/** Allowed clock-skew tolerance for a report that appears to be slightly in the future. */
+constexpr int64_t kFutureSkewToleranceSec = 10 * 60;
+
 bool isLeapYear(int y) { return (y % 4 == 0 && y % 100 != 0) || (y % 400 == 0); }
 
 int daysInMonth(int y, int m) {
@@ -82,7 +85,7 @@ bool inferObservationTime(int dd, int hh, int mm, std::time_t now_utc, std::time
 
     const std::time_t candidate = timeForYmdHm(y2, m2, dd, hh, mm);
     const int64_t diff = static_cast<int64_t>(now_utc) - static_cast<int64_t>(candidate);
-    const bool valid_past = diff >= -300;
+    const bool valid_past = diff >= -kFutureSkewToleranceSec;
     const int64_t score = diff >= 0 ? diff : -diff;
 
     if (!have_candidate || (valid_past && !best_is_valid_past) ||
@@ -220,13 +223,16 @@ ParseResult parseTacLine(const char* tac, std::time_t now_utc, EhamWeather* out)
 
   char* saveptr = nullptr;
   char* tok = strtok_r(buf, " ", &saveptr);
-  if (tok == nullptr || (strcmp(tok, "METAR") != 0 && strcmp(tok, "SPECI") != 0)) {
-    return ParseResult::MalformedReport;
-  }
-
-  tok = strtok_r(nullptr, " ", &saveptr);
   if (tok == nullptr) return ParseResult::MalformedReport;
-  if (strcmp(tok, "EHAM") != 0) return ParseResult::NoEhamReport;
+
+  // The report-type keyword is sometimes omitted ahead of the bare ICAO code.
+  const char* station = tok;
+  if (strcmp(tok, "METAR") == 0 || strcmp(tok, "SPECI") == 0) {
+    tok = strtok_r(nullptr, " ", &saveptr);
+    if (tok == nullptr) return ParseResult::MalformedReport;
+    station = tok;
+  }
+  if (strcmp(station, "EHAM") != 0) return ParseResult::NoEhamReport;
 
   tok = strtok_r(nullptr, " ", &saveptr);
   if (tok == nullptr || strlen(tok) != 7 || tok[6] != 'Z' || !isAllDigits(tok, 6)) {
@@ -239,7 +245,7 @@ ParseResult parseTacLine(const char* tac, std::time_t now_utc, EhamWeather* out)
 
   std::time_t observed = 0;
   if (!inferObservationTime(dd, hh, mi, now_utc, &observed)) return ParseResult::MalformedReport;
-  if (observed - now_utc > 300) return ParseResult::MalformedReport;
+  if (observed - now_utc > kFutureSkewToleranceSec) return ParseResult::MalformedReport;
   if (now_utc - observed > kMaxReportAgeSec) return ParseResult::Stale;
 
   EhamWeather w{};
@@ -332,6 +338,12 @@ void runMetarParserSelfTest() {
     const ParseResult r =
         parseTacLine("METAR EHRD 212155Z AUTO 28001KT 9999 FEW032 15/13 Q1026 NOSIG=", kNow, &w);
     expect("non-EHAM station rejected", r == ParseResult::NoEhamReport);
+  }
+  {
+    EhamWeather w{};
+    const ParseResult r = parseTacLine("EHAM 212155Z 34004KT 9999 FEW015 SCT026 BKN037 17/13 Q1025 NOSIG=",
+                                        kNow, &w);
+    expect("bare ICAO (no METAR/SPECI keyword)", r == ParseResult::Ok && w.wind_direction_deg == 340);
   }
   {
     EhamWeather w{};
