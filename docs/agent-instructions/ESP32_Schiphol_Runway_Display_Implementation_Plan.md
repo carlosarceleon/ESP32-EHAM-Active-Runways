@@ -28,74 +28,63 @@ At the end of all of your changes, push, monitor CI runs and if everything is ok
 
 If you have any strong concerns consult with the human.
 
-**Status (2026-07-22):** Milestones 0-9 are done. Milestone 9 (this session)
-is on branch `milestone-9-metar-weather`, not yet merged — see the PR-status
-note at the end of this handover before assuming it's live on `main`.
+**Status (2026-07-22):** Milestones 0-10 are done. Milestone 10 (this
+session) is on branch `milestone-10-finalize-release`, not yet merged --
+see the PR-status note at the end of this handover.
 
-**Milestone 9 changes:** added `services::metar` (`metar_parser.h/.cpp`) and
-`services::metar_client` (`knmi_metar_client.h/.cpp`).
+**Milestone 10 changes:** removed the entire unused legacy ADS-B radar mode
+and its embedded global airport dataset -- `adsb_client`, `radar_location`,
+`radar_display`, `radar_range`, `radar_theme`, `runway_overlay`,
+`large_airports` (+ `scripts/build_large_airports.py`). Confirmed via
+repo-wide search that nothing outside those files referenced them (the
+runway display already fully replaced the radar screen in earlier
+milestones; these were dead code, not wired into `main.cpp`). Removed the
+now-dead `kDefaultRadarLat/Lon` and `kAdsbFetch*`/`kAdsbShowGroundAircraft`
+constants from `config.h`, and a stale comment in `wifi_setup.cpp`
+referencing the radar module's now-deleted `ehamrunways` NVS namespace (the
+namespace itself needs no migration -- any leftover NVS blob on an
+already-flashed device is simply never opened again, harmless). Added
+`config::kFirmwareVersion` (printed at boot). Rewrote `README.md` from
+scratch around what the firmware actually does today (previously very
+stale -- it still described radar range presets and ADS-B config that had
+already been unreachable from `main.cpp` for several milestones): setup,
+data sources table, KNMI token behavior, controls, configuration,
+troubleshooting, attribution. `EHAM_ENABLE_FIXTURES` was already
+off-by-default in the `supermini` env (only `supermini_eham_selftest` sets
+it) -- no change needed there. Left the partition file and release artifact
+names as-is (step 5 in the plan is conditional -- "only if this does not
+break existing build scripts" -- and renaming had no concrete benefit
+worth the churn/risk here).
 
-- `services::metar::extractTacComment()` pulls the first `<!-- METAR ... -->`
-  / `<!-- SPECI ... -->` comment out of a raw KNMI file body;
-  `parseTacLine()` parses that bare TAC line (station must be `EHAM`, else
-  `NoEhamReport`), inferring the observation month by trying the current
-  month and its neighbors against a supplied `now_utc`, and rejecting
-  anything older than 90 minutes (`ParseResult::Stale`). Handles standard/
-  gust/`VRB`-variable/trailing-`dddVddd`-variable/calm wind and signed
-  temperature. `parseKnmiMetarFile()` composes extraction + parsing.
-- `services::metar_client::metarLoop()` implements the list -> file-url ->
-  anonymous-download workflow (`config::kKnmiApiBase`), using
-  `services::knmi_token::knmiToken()` as the bearer token for the first two
-  requests only -- never forwarded to the temporary signed download URL. On
-  401/403 it forces a token refresh (`knmiTokenForceRefresh()` +
-  `knmiTokenLoop()`) and retries the whole workflow once; any other failure
-  ends the cycle with weather left unavailable. Weather is explicitly marked
-  unavailable at the start of every cycle and only marked available again
-  after a full parse success. 30-minute schedule plus a fixed per-device
-  jitter derived from `ESP.getEfuseMac()`.
-- `main.cpp` now composes `services::runway::currentState()` +
-  `services::metar_client::currentWeather()` into the state handed to
-  `ui::ehamDisplayDraw()`, and redraws on either service's change flag.
-  `ui::eham_display` draws a compact weather row (e.g. `250V 18G32KT  14C`)
-  in the same bottom-banner slot as "LIVE DATA UNAVAILABLE" -- only one of
-  the two is ever shown, and only when runway data is available (weather
-  is skipped, not stacked, when runway data is down).
-- Added `docs/agent-instructions/...` (this doc) update plus a new
-  `## KNMI METAR parsing and rendering (Milestone 9)` section in
-  `docs/external-data-contracts.md`. Added fixtures
-  `metar_eham_gust.txt` / `metar_eham_variable.txt` / `metar_eham_calm.txt`
-  (bare TAC lines, same convention as the existing `metar_eham.txt`).
-  `runMetarParserSelfTest()` (gated by `EHAM_ENABLE_FIXTURES`, called from
-  `main.cpp`) hardcodes vectors mirroring all of these plus a month-boundary
-  and a stale-report case.
+**Not done -- flagging per the plan's own "strong concerns" clause:** the
+plan's acceptance criteria for this milestone include a 24-hour soak test
+and tagging the first release *only after* that soak test completes. Both
+require flashing a physical board and leaving it running, which isn't
+possible from this environment. I did not perform a soak test and did not
+tag a release. Everything else in the milestone (code removal, hardening
+review, docs) is done; `pio run -e supermini` / `-e supermini_eham_selftest`
+both build clean. **Before tagging `v1.0.0`, run the soak test on real
+hardware first.**
 
-**Next up: Milestone 10** (remove radar code, harden, document, release).
+**Lessons learned from Milestone 10:**
 
-**Lessons learned from Milestone 9:**
-
-- `EhamWeather` already existed in `domain/eham_state.h` from an earlier
-  milestone -- no domain-model change was needed, only the two new services
-  and the display/main wiring.
-- The real fixtures (`metar_eham.txt`, `metar_no_eham.txt`) are enough to
-  prove the extraction-from-wrapped-body and wrong-station paths
-  end-to-end; the parser-level cases (gust/variable/calm/stale/month-
-  boundary/malformed) are exercised against synthetic bare TAC lines instead
-  since capturing a real gusty/calm/negative-temperature EHAM report on
-  demand isn't practical.
-- Runway and weather are two fully independent services with their own
-  scheduling, HTTP calls, and change flags; `main.cpp` only combines them at
-  the point of drawing. This keeps the "weather never blocks runway
-  scheduling" acceptance criterion trivially true rather than something to
-  defend against.
-- Both `pio run -e supermini` and `-e supermini_eham_selftest` build clean
-  after these changes -- no on-device/hardware run was performed this
-  session (no physical board attached); verify visually before relying on
-  the weather-row layout description above.
+- Dead code from a superseded feature can sit in a repo for several
+  milestones with zero build-time signal that it's unreferenced (PlatformIO
+  compiles everything under `src/`, not just what `main.cpp` reaches) --
+  `grep -rln` for each candidate file's own name across the repo (excluding
+  `.pio/`) before deleting was enough to confirm nothing else pulled it in.
+- Documentation (README in particular) can silently rot behind several
+  merged milestones if nothing in the review process forces a re-read of
+  it against current `main.cpp` behavior -- worth treating "does the README
+  still match what's wired up" as its own checklist item on any milestone
+  that changes what's active, not just the one that finally does the
+  cleanup.
 
 **PR status:** not yet pushed/opened as of writing this handover -- follow
 the "IMPORTANT: Development cycle" note at the top of this document (push,
-monitor CI, merge to `main`) before starting Milestone 10, or check
-`gh pr list` / `git log origin/main` first if you're picking this up cold.
+monitor CI, merge to `main`) if you're picking this up cold, or check
+`gh pr list` / `git log origin/main` first.
+
 
 **Milestone 8 changes:** added `services::knmi_token`
 (`knmi_token_manager.h/.cpp`). `knmiTokenInit()` loads any cached
