@@ -69,6 +69,20 @@ constexpr uint8_t kRunwayFailuresBeforeSlowBackoff = 3;
 /** Keep showing the last successful fetch as "live" for this long before clearing it. */
 constexpr long kRunwayFreshnessLimitSec = 15 * 60;
 
+// --- KNMI anonymous token manifest ---
+constexpr char kKnmiManifestUrl[] =
+    "https://raw.githubusercontent.com/carlosarceleon/schiphol-display-config/main/knmi-token.json";
+constexpr char kKnmiApiBase[] = "https://api.dataplatform.knmi.nl/open-data/v1";
+/** Cheapest possible KNMI request, used only to confirm a token is accepted. */
+constexpr char kKnmiFileListValidationPath[] =
+    "/datasets/metar/versions/1.0/files?maxKeys=1&orderBy=created&sorting=desc";
+constexpr size_t kKnmiManifestMaxBytes = 2048;
+constexpr size_t kKnmiValidationMaxBytes = 4096;
+/** Normal refresh cadence once a token has ever been verified. */
+constexpr unsigned long kKnmiTokenRefreshIntervalMs = 24UL * 60 * 60 * 1000;
+/** Faster retry cadence until the first token is ever verified (or after a forced refresh keeps failing). */
+constexpr unsigned long kKnmiTokenRetryIntervalMs = 5UL * 60 * 1000;
+
 // --- UI colors (RGB565) — status screens ---
 constexpr uint16_t kColorBlack = 0x0000;
 constexpr uint16_t kColorYellow = 0xFFE0;
