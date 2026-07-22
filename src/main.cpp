@@ -94,7 +94,7 @@ void setup() {
   Serial.begin(115200);
   delay(500);
   Serial.println();
-  Serial.println("Schiphol Runway Display");
+  Serial.printf("Schiphol Runway Display v%s\n", config::kFirmwareVersion);
 
   bootButtonInit();
   displayInit();

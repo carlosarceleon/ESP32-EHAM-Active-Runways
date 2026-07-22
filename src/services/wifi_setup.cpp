@@ -52,7 +52,6 @@ void initBootButton() {
 
 namespace {
 
-/** Separate from ehamrunways prefs (rangeInit) to avoid NVS handle conflicts. */
 constexpr char kWifiPrefsNamespace[] = "wifi";
 constexpr char kPrefsForcePortalKey[] = "portal";
 
