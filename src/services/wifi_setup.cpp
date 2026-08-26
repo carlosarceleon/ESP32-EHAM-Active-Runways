@@ -56,6 +56,9 @@ constexpr char kWifiPrefsNamespace[] = "wifi";
 constexpr char kPrefsForcePortalKey[] = "portal";
 
 bool s_force_config_portal = false;
+// A reset can reboot while BOOT is still held. Do not treat that same hold as
+// a second reset on the forced-portal boot; clear the guard on release.
+bool s_ignore_long_press_until_release = false;
 WiFiManager s_wm;
 bool s_wm_configured = false;
 
@@ -280,9 +283,15 @@ bool openConfigPortal() {
   statusScreenPortal();
   s_wm.setConfigPortalBlocking(false);
   s_wm.startConfigPortal(config::kPortalApName);
+  if (!s_wm.getConfigPortalActive()) {
+    Serial.println("WiFi setup portal failed to start");
+    return false;
+  }
+  Serial.printf("WiFi setup AP ready: %s (%s)\n", config::kPortalApName,
+                config::kPortalIp);
   while (s_wm.getConfigPortalActive()) {
     bootButtonPollLongPress();
-    if (s_wm.process()) {
+    if (s_wm.process() && wifiLinkUp()) {
       return true;
     }
     delay(10);
@@ -331,7 +340,7 @@ void bootButtonPollLongPress() {
     const unsigned long down_ms = s_boot_down_ms;
     portEXIT_CRITICAL(&s_boot_mux);
 
-    if (!s_long_press_handled &&
+    if (!s_ignore_long_press_until_release && !s_long_press_handled &&
         millis() - down_ms >= config::kBootResetHoldMs) {
       s_long_press_handled = true;
       Serial.println("BOOT held — resetting WiFi");
@@ -342,6 +351,7 @@ void bootButtonPollLongPress() {
     s_boot_is_down = false;
     portEXIT_CRITICAL(&s_boot_mux);
     s_long_press_handled = false;
+    s_ignore_long_press_until_release = false;
   }
 }
 
@@ -354,6 +364,10 @@ void wifiResetCredentialsAndReboot() {
 
 bool wifiReconnect() {
   initBootButton();
+  if (!storedWifiCredentials()) {
+    Serial.println("No saved WiFi — reopening setup portal");
+    return openConfigPortal() && wifiLinkUp();
+  }
   Serial.println("WiFi reconnecting...");
   return connectSavedNetwork(true);
 }
@@ -378,6 +392,10 @@ bool wifiSetupConnect() {
   ensureWifiManager();
 
   const bool force_portal = consumeForceConfigPortal();
+  if (force_portal) {
+    // The reset may have happened before the user released BOOT.
+    s_ignore_long_press_until_release = true;
+  }
   WiFi.setAutoReconnect(false);
 
   if (force_portal) {
