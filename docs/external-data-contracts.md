@@ -105,7 +105,7 @@ See `config::kRunwayFetchIntervalMs` / `kRunwayRetryIntervalMs` /
 
 ---
 
-## KNMI METAR (Milestone 7 discovery)
+## Historical KNMI METAR discovery (superseded)
 
 Discovered with `tools/inspect_knmi_metar.py` against the live KNMI Open
 Data API, using the anonymous token from the public
@@ -189,11 +189,11 @@ required.
 
 ---
 
-## KNMI METAR parsing and rendering (Milestone 9)
+## METAR parsing and rendering (AWC)
 
 `services::metar` (`src/services/metar_parser.cpp`) implements two layers:
 
-1. `extractTacComment()` — scans a raw KNMI file body for the first
+1. `extractTacComment()` — scans a raw IWXXM file body for the first
    `<!-- METAR ... -->` / `<!-- SPECI ... -->` comment, collapsing internal
    whitespace/newlines into single spaces. Returns false if no such comment
    exists at all (distinct from "comment present but wrong station").
@@ -217,32 +217,19 @@ required.
 
 ### `services::metar_client` (`src/services/knmi_metar_client.cpp`)
 
-Implements the list -> file-url -> download workflow against
-`config::kKnmiApiBase`, reusing `services::knmi_token` for the bearer token:
+The client calls the public AWC endpoint configured by `config::kAwcMetarUrl`
+(`format=raw`) with the firmware's custom `User-Agent`. AWC returns one or
+more raw METAR lines; the client scans those lines and reuses `parseTacLine()`
+to select the EHAM report. No API key or bearer token is sent.
 
-1. `GET /datasets/metar/versions/1.0/files?maxKeys=25&orderBy=created&sorting=desc`
-   with `Authorization: <token>`, filtered client-side for the first
-   filename containing `EHAM` (most recent, since the list is already
-   `sorting=desc`).
-2. `GET /datasets/metar/versions/1.0/files/<url-encoded-filename>/url` with
-   the same `Authorization` header, extracting `temporaryDownloadUrl`.
-3. `GET <temporaryDownloadUrl>` — **no** `Authorization` header; this is an
-   unrelated, short-lived signed-URL host.
-
-On a 401/403 from either of the first two (authenticated) requests, the
-client calls `services::knmi_token::knmiTokenForceRefresh()` +
-`knmiTokenLoop()` and retries the complete workflow exactly once with
-whatever token results. Any other failure (network, non-200, malformed
-JSON, no EHAM filename in the listing, parser rejection) ends the cycle
-silently — weather stays unavailable, and runway fetch scheduling is
-untouched either way, since the two services share no state or blocking
-calls beyond their own HTTP requests.
+Any network error, non-200 response, oversized body, or parser rejection ends
+the cycle with weather unavailable; runway fetch scheduling is untouched.
 
 At the start of every refresh cycle, weather is marked unavailable; it is
-only marked available again once the whole workflow *and* the parse
-succeed (`ParseResult::Ok`). Refresh cadence is 30 minutes plus a fixed
-per-device jitter (`ESP.getEfuseMac() % kKnmiMetarJitterRangeMs`), so
-identically-scheduled devices don't all poll KNMI at once.
+only marked available again once the fetch and parse succeed
+(`ParseResult::Ok`). Refresh cadence is 30 minutes plus a fixed per-device
+jitter (`ESP.getEfuseMac() % kMetarJitterRangeMs`), so identically-scheduled
+devices don't all poll AWC at once.
 
 ### Rendering
 

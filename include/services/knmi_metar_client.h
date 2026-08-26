@@ -6,9 +6,9 @@ namespace services::metar_client {
 
 /**
  * Call every loop() iteration once Wi-Fi is connected. No-op until the clock
- * is valid and a KNMI token is available. Refreshes on a 30-minute schedule
- * (plus a fixed per-device jitter). May block for up to a few HTTP timeouts
- * while a fetch is in flight; never affects runway fetch scheduling.
+ * is valid. Refreshes on a 30-minute schedule (plus a fixed per-device
+ * jitter). May block for up to one HTTP timeout while a fetch is in flight;
+ * never affects runway fetch scheduling.
  */
 void metarLoop();
 

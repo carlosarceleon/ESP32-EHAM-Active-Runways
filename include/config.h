@@ -61,33 +61,13 @@ constexpr uint8_t kRunwayFailuresBeforeSlowBackoff = 3;
 /** Keep showing the last successful fetch as "live" for this long before clearing it. */
 constexpr long kRunwayFreshnessLimitSec = 15 * 60;
 
-// --- KNMI anonymous token manifest ---
-constexpr char kKnmiManifestUrl[] =
-    "https://raw.githubusercontent.com/carlosarceleon/schiphol-display-config/main/knmi-token.json";
-constexpr char kKnmiApiBase[] = "https://api.dataplatform.knmi.nl/open-data/v1";
-/** Cheapest possible KNMI request, used only to confirm a token is accepted. */
-constexpr char kKnmiFileListValidationPath[] =
-    "/datasets/metar/versions/1.0/files?maxKeys=1&orderBy=created&sorting=desc";
-constexpr size_t kKnmiManifestMaxBytes = 2048;
-constexpr size_t kKnmiValidationMaxBytes = 4096;
-/** Normal refresh cadence once a token has ever been verified. */
-constexpr unsigned long kKnmiTokenRefreshIntervalMs = 24UL * 60 * 60 * 1000;
-/** Faster retry cadence until the first token is ever verified (or after a forced refresh keeps failing). */
-constexpr unsigned long kKnmiTokenRetryIntervalMs = 5UL * 60 * 1000;
-
-// --- KNMI METAR (weather row) ---
-/** Lists the most recently created files across all stations; filtered client-side for "EHAM". */
-constexpr char kKnmiMetarFileListPath[] =
-    "/datasets/metar/versions/1.0/files?maxKeys=25&orderBy=created&sorting=desc";
-constexpr char kKnmiMetarFileUrlPathPrefix[] = "/datasets/metar/versions/1.0/files/";
-constexpr char kKnmiMetarFileUrlPathSuffix[] = "/url";
-constexpr size_t kKnmiMetarListMaxBytes = 16 * 1024;
-constexpr size_t kKnmiMetarUrlMaxBytes = 2 * 1024;
-/** Observed file size is ~3.0-3.6 KB; leaves headroom without risking the 64 KiB display buffer budget. */
-constexpr size_t kKnmiMetarFileMaxBytes = 8 * 1024;
-constexpr unsigned long kKnmiMetarFetchIntervalMs = 30UL * 60 * 1000;
-/** Deterministic 0-120s per-device spread so devices don't all poll KNMI at the same instant. */
-constexpr unsigned long kKnmiMetarJitterRangeMs = 120UL * 1000;
+// --- AWC METAR (weather row) ---
+/** Public Aviation Weather Center endpoint; no API key is required. */
+constexpr char kAwcMetarUrl[] = "https://aviationweather.gov/api/data/metar?ids=EHAM&format=raw";
+constexpr size_t kAwcMetarMaxBytes = 4096;
+constexpr unsigned long kMetarFetchIntervalMs = 30UL * 60 * 1000;
+/** Deterministic 0-120s per-device spread so devices don't all poll at the same instant. */
+constexpr unsigned long kMetarJitterRangeMs = 120UL * 1000;
 
 // --- UI colors (RGB565) — status screens ---
 constexpr uint16_t kColorBlack = 0x0000;

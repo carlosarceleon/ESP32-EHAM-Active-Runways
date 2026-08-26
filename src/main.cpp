@@ -11,7 +11,6 @@
 #include "hardware/display.h"
 #include "services/clock_service.h"
 #include "services/knmi_metar_client.h"
-#include "services/knmi_token_manager.h"
 #include "services/metar_parser.h"
 #include "services/runway_client.h"
 #include "services/runway_parser.h"
@@ -99,7 +98,6 @@ void setup() {
   bootButtonInit();
   displayInit();
   ui::schiphol::initPalette();
-  services::knmi_token::knmiTokenInit();
 
 #if defined(EHAM_ENABLE_FIXTURES)
   data::eham_runways::runSelfTest();
@@ -152,7 +150,6 @@ void loop() {
     }
 
     services::runway::runwayLoop();
-    services::knmi_token::knmiTokenLoop();
     services::metar_client::metarLoop();
 
     const bool runway_changed = services::runway::consumeStateChanged();

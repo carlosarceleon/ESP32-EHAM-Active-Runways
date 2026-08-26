@@ -19,7 +19,7 @@ Forked from [MatixYo/ESP32-Plane-Radar](https://github.com/MatixYo/ESP32-Plane-R
    stylized Schiphol map, refreshed every 5 minutes from
    [dutchplanespotters.nl](https://www.dutchplanespotters.nl/)
 3. **Weather (optional)** — a compact wind/temperature row from the official
-   KNMI EHAM METAR, refreshed every 30 minutes, shown only when a recent
+   AWC EHAM METAR, refreshed every 30 minutes, shown only when a recent
    report is available
 
 After Wi‑Fi is saved, the device reconnects automatically and keeps running
@@ -30,23 +30,12 @@ without further input.
 | Data | Source | Refresh | Behavior when unavailable |
 |------|--------|---------|----------------------------|
 | Runway usage | [dutchplanespotters.nl](https://www.dutchplanespotters.nl/api/runways/ams) (aggregates LVNL data) | 5 min (1 min / 5 min backoff on failure) | Last known state shown as live for up to 15 min, then a `LIVE DATA UNAVAILABLE` banner replaces the map annotations |
-| Weather (METAR) | [KNMI Open Data](https://developer.dataplatform.knmi.nl/) `metar` dataset (CC BY 4.0) | 30 min + per-device jitter | Weather row silently disappears; never affects runway display |
+| Weather (METAR) | [Aviation Weather Center Data API](https://aviationweather.gov/data/api/) | 30 min + per-device jitter | Weather row silently disappears; never affects runway display |
 
 Both feeds run as independent services with their own schedules and error
-handling — a KNMI outage never delays or blocks a runway refresh, and vice
+handling — a weather API outage never delays or blocks a runway refresh, and vice
 versa. See `docs/external-data-contracts.md` for the full wire-format
 details these clients were built against.
-
-### KNMI anonymous token
-
-Weather fetching needs a KNMI Open Data API token. This firmware never
-embeds one directly — it fetches a small, publicly-hosted manifest
-(`config::kKnmiManifestUrl`, a separate `schiphol-display-config` repo)
-containing a shared anonymous token, validates it structurally and against
-KNMI's own API before trusting it, and caches the result in NVS. See
-`docs/maintenance.md` for the token-rotation runbook. If the manifest or
-KNMI is unreachable, the last verified cached token keeps being used —
-nothing changes on-screen or requires end-user action either way.
 
 ## Controls (BOOT, GPIO 9, active LOW)
 
@@ -95,8 +84,7 @@ Edit **`include/config.h`** for hardware and behavior:
 | BOOT | `kBootPin`, `kBootResetHoldMs`, `kBootTapMinMs` |
 | Display SPI | pins, `kDisplayInvert`, `kDisplayRgbOrder`, `kDisplaySpiWriteHz` |
 | Runway API | `kRunwayApiUrl`, fetch/retry/backoff intervals, freshness limit |
-| KNMI token | `kKnmiManifestUrl`, `kKnmiApiBase`, refresh/retry intervals |
-| KNMI METAR | file-list/url paths, body-size limits, fetch interval, jitter range |
+| AWC METAR | `kAwcMetarUrl`, body-size limit, fetch interval, jitter range |
 
 ## Project layout
 
@@ -120,7 +108,6 @@ include/
     clock_service.h
     runway_client.h
     runway_parser.h
-    knmi_token_manager.h
     knmi_metar_client.h
     metar_parser.h
 data/
@@ -223,7 +210,7 @@ the release. Download from **Releases** on GitHub, then flash at **0x0**
 |---------|-------|
 | Stuck on setup screen | Confirm the home network is 2.4 GHz (ESP32-C3 has no 5 GHz radio) |
 | `LIVE DATA UNAVAILABLE` banner | Normal after ~15 min without a successful runway fetch; check Wi‑Fi and the serial log for `runway:` HTTP errors |
-| No weather row | Expected whenever no recent EHAM METAR is available (KNMI publishes roughly every 30 min); check the serial log for `metar:`/`knmi:` messages before assuming a bug |
+| No weather row | Expected whenever no recent EHAM METAR is available; check the serial log for `metar:` messages before assuming a bug |
 | Can't reach the portal by hostname | Use the device's IP instead — some OSes resolve `.local` slowly or not at all |
 | Colors look swapped (red/blue) on a new panel revision | See `ui::schiphol::toPanelColor()`'s doc comment and `paletteCalibrationDraw()` (fixture build only) |
 
@@ -232,7 +219,7 @@ the release. Download from **Releases** on GitHub, then flash at **0x0**
 - Original firmware: [MatixYo/ESP32-Plane-Radar](https://github.com/MatixYo/ESP32-Plane-Radar) (MIT)
 - EHAM runway schematic reference: [archofthings/ha-schiphol-runway-card](https://github.com/archofthings/ha-schiphol-runway-card) (MIT)
 - Runway usage data: [dutchplanespotters.nl](https://www.dutchplanespotters.nl/), aggregating LVNL data
-- Weather data: KNMI Open Data `metar` dataset (CC BY 4.0)
+- Weather data: [Aviation Weather Center Data API](https://aviationweather.gov/data/api/)
 
 ## Dependencies
 
