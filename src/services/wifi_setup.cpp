@@ -61,11 +61,31 @@ bool s_force_config_portal = false;
 bool s_ignore_long_press_until_release = false;
 WiFiManager s_wm;
 bool s_wm_configured = false;
+uint8_t s_wifi_channel = 0;
 
 void ensureWifiManager();
 void startLanWebPortal();
 void stopLanWebPortal();
 bool wifiLinkUp();
+
+void onWifiEvent(arduino_event_id_t event, arduino_event_info_t info) {
+  if (event == ARDUINO_EVENT_WIFI_STA_CONNECTED) {
+    const auto& connected = info.wifi_sta_connected;
+    s_wifi_channel = connected.channel;
+    Serial.printf("WiFi AP: %02X:%02X:%02X:%02X:%02X:%02X channel=%u RSSI=%d dBm\n",
+                  connected.bssid[0], connected.bssid[1], connected.bssid[2],
+                  connected.bssid[3], connected.bssid[4], connected.bssid[5],
+                  connected.channel, WiFi.RSSI());
+  } else if (event == ARDUINO_EVENT_WIFI_STA_DISCONNECTED) {
+    const auto& disconnected = info.wifi_sta_disconnected;
+    Serial.printf(
+        "WiFi disconnected: reason=%u BSSID=%02X:%02X:%02X:%02X:%02X:%02X "
+        "channel=%u RSSI=%d dBm\n",
+        disconnected.reason, disconnected.bssid[0], disconnected.bssid[1],
+        disconnected.bssid[2], disconnected.bssid[3], disconnected.bssid[4],
+        disconnected.bssid[5], s_wifi_channel, disconnected.rssi);
+  }
+}
 
 void markForceConfigPortal() {
   s_force_config_portal = true;
@@ -143,7 +163,6 @@ void resetWifiCredentials() {
 }
 
 void onConfigPortalApStarted(WiFiManager*) {
-  WiFi.setTxPower(WIFI_POWER_8_5dBm);
   statusScreenPortal();
 #ifdef WM_MDNS
   if (MDNS.begin(config::kPortalHostname)) {
@@ -172,6 +191,7 @@ void ensureWifiManager() {
                            IPAddress(255, 255, 255, 0));
   s_wm.setHostname(config::kPortalHostname);
   s_wm.setAPCallback(onConfigPortalApStarted);
+  WiFi.onEvent(onWifiEvent);
   s_wm_configured = true;
 }
 
@@ -204,7 +224,6 @@ void stopLanWebPortal() {
 }
 
 void prepareSta() {
-  WiFi.setTxPower(WIFI_POWER_8_5dBm);
   WiFi.mode(WIFI_STA);
   WiFi.setSleep(WIFI_PS_NONE);
   WiFi.setAutoReconnect(true);
@@ -364,10 +383,6 @@ void wifiResetCredentialsAndReboot() {
 
 bool wifiReconnect() {
   initBootButton();
-  if (!storedWifiCredentials()) {
-    Serial.println("No saved WiFi — reopening setup portal");
-    return openConfigPortal() && wifiLinkUp();
-  }
   Serial.println("WiFi reconnecting...");
   return connectSavedNetwork(true);
 }
