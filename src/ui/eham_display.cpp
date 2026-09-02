@@ -33,6 +33,12 @@ constexpr int kEndLabelGapPx = 9;
 constexpr int kEndLabelHeightPx = 11;
 constexpr int kTitleHeightPx = 20;
 constexpr int kTitleTopY = 8;
+constexpr int kWindArrowCenterX = kFrameSize / 2;
+constexpr int kWindArrowCenterY = 47;
+constexpr float kWindArrowMinLengthPx = 12.0f;
+constexpr float kWindArrowMaxLengthPx = 30.0f;
+constexpr uint16_t kBeaufort1MinKt = 1;
+constexpr uint16_t kBeaufort5MaxKt = 21;
 
 struct Vec2 {
   float x;
@@ -60,6 +66,21 @@ Vec2 pctToScreen(float x_pct, float y_pct) {
   return {kMapLeft + (x_pct * 0.01f) * static_cast<float>(kMapRight - kMapLeft),
           kMapTop + (y_pct * 0.01f) * static_cast<float>(kMapBottom - kMapTop)};
 }
+
+constexpr float windArrowLength(uint16_t speed_kt) {
+  return speed_kt <= kBeaufort1MinKt
+             ? kWindArrowMinLengthPx
+             : speed_kt >= kBeaufort5MaxKt
+                   ? kWindArrowMaxLengthPx
+                   : kWindArrowMinLengthPx +
+                         (kWindArrowMaxLengthPx - kWindArrowMinLengthPx) *
+                             static_cast<float>(speed_kt - kBeaufort1MinKt) /
+                             static_cast<float>(kBeaufort5MaxKt - kBeaufort1MinKt);
+}
+
+static_assert(windArrowLength(0) == kWindArrowMinLengthPx);
+static_assert(windArrowLength(21) == kWindArrowMaxLengthPx);
+static_assert(windArrowLength(40) == kWindArrowMaxLengthPx);
 
 LGFX_Sprite s_frame(&tft);
 bool s_frame_ready = false;
@@ -136,6 +157,32 @@ void drawTitle(lgfx::LGFXBase& gfx) {
   gfx.setTextDatum(textdatum_t::top_center);
   gfx.setTextColor(schiphol::kColorTitle, schiphol::kColorBackground);
   gfx.drawString("EHAM", kFrameSize / 2, kTitleTopY);
+}
+
+void drawWindArrow(lgfx::LGFXBase& gfx, const EhamWeather& weather) {
+  if (!weather.available || weather.calm_wind ||
+      (weather.variable_wind && weather.wind_direction_deg == 0)) {
+    return;
+  }
+
+  constexpr float kDegreesToRadians = 3.14159265358979323846f / 180.0f;
+  const float angle = weather.wind_direction_deg * kDegreesToRadians;
+  const Vec2 dir = {sinf(angle), -cosf(angle)};
+  const float arrow_length = windArrowLength(weather.wind_speed_kt);
+  const Vec2 center = {kWindArrowCenterX, kWindArrowCenterY};
+  const Vec2 tail = sub(center, scale(dir, arrow_length * 0.5f));
+  const Vec2 tip = add(center, scale(dir, arrow_length * 0.5f));
+  constexpr float kHeadLengthPx = 6.0f;
+  constexpr float kHeadHalfWidthPx = 4.0f;
+  const Vec2 head_base = sub(tip, scale(dir, kHeadLengthPx));
+  const Vec2 head_perp = scale(perpOf(dir), kHeadHalfWidthPx);
+
+  gfx.drawWideLine(lroundf(tail.x), lroundf(tail.y), lroundf(head_base.x),
+                   lroundf(head_base.y), 1.5f, schiphol::kColorWeather);
+  gfx.fillTriangle(lroundf(tip.x), lroundf(tip.y),
+                   lroundf(head_base.x + head_perp.x), lroundf(head_base.y + head_perp.y),
+                   lroundf(head_base.x - head_perp.x), lroundf(head_base.y - head_perp.y),
+                   schiphol::kColorWeather);
 }
 
 void drawChevron(lgfx::LGFXBase& gfx, Vec2 center, Vec2 dir, uint16_t color) {
@@ -256,6 +303,7 @@ void renderFrame(lgfx::LGFXBase& gfx, const EhamOperationalState& state) {
   for (size_t i = 0; i < data::eham_runways::runwayCount(); ++i) {
     drawRunway(gfx, i, state.runways[i]);
   }
+  drawWindArrow(gfx, state.weather);
   if (!state.runway_data_available) {
     drawUnavailableBanner(gfx);
   } else if (state.weather.available) {

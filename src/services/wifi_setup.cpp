@@ -52,18 +52,40 @@ void initBootButton() {
 
 namespace {
 
-/** Separate from ehamrunways prefs (rangeInit) to avoid NVS handle conflicts. */
 constexpr char kWifiPrefsNamespace[] = "wifi";
 constexpr char kPrefsForcePortalKey[] = "portal";
 
 bool s_force_config_portal = false;
+// A reset can reboot while BOOT is still held. Do not treat that same hold as
+// a second reset on the forced-portal boot; clear the guard on release.
+bool s_ignore_long_press_until_release = false;
 WiFiManager s_wm;
 bool s_wm_configured = false;
+uint8_t s_wifi_channel = 0;
 
 void ensureWifiManager();
 void startLanWebPortal();
 void stopLanWebPortal();
 bool wifiLinkUp();
+
+void onWifiEvent(arduino_event_id_t event, arduino_event_info_t info) {
+  if (event == ARDUINO_EVENT_WIFI_STA_CONNECTED) {
+    const auto& connected = info.wifi_sta_connected;
+    s_wifi_channel = connected.channel;
+    Serial.printf("WiFi AP: %02X:%02X:%02X:%02X:%02X:%02X channel=%u RSSI=%d dBm\n",
+                  connected.bssid[0], connected.bssid[1], connected.bssid[2],
+                  connected.bssid[3], connected.bssid[4], connected.bssid[5],
+                  connected.channel, WiFi.RSSI());
+  } else if (event == ARDUINO_EVENT_WIFI_STA_DISCONNECTED) {
+    const auto& disconnected = info.wifi_sta_disconnected;
+    Serial.printf(
+        "WiFi disconnected: reason=%u BSSID=%02X:%02X:%02X:%02X:%02X:%02X "
+        "channel=%u RSSI=%d dBm\n",
+        disconnected.reason, disconnected.bssid[0], disconnected.bssid[1],
+        disconnected.bssid[2], disconnected.bssid[3], disconnected.bssid[4],
+        disconnected.bssid[5], s_wifi_channel, disconnected.rssi);
+  }
+}
 
 void markForceConfigPortal() {
   s_force_config_portal = true;
@@ -141,7 +163,6 @@ void resetWifiCredentials() {
 }
 
 void onConfigPortalApStarted(WiFiManager*) {
-  WiFi.setTxPower(WIFI_POWER_8_5dBm);
   statusScreenPortal();
 #ifdef WM_MDNS
   if (MDNS.begin(config::kPortalHostname)) {
@@ -170,6 +191,7 @@ void ensureWifiManager() {
                            IPAddress(255, 255, 255, 0));
   s_wm.setHostname(config::kPortalHostname);
   s_wm.setAPCallback(onConfigPortalApStarted);
+  WiFi.onEvent(onWifiEvent);
   s_wm_configured = true;
 }
 
@@ -202,7 +224,6 @@ void stopLanWebPortal() {
 }
 
 void prepareSta() {
-  WiFi.setTxPower(WIFI_POWER_8_5dBm);
   WiFi.mode(WIFI_STA);
   WiFi.setSleep(WIFI_PS_NONE);
   WiFi.setAutoReconnect(true);
@@ -281,9 +302,15 @@ bool openConfigPortal() {
   statusScreenPortal();
   s_wm.setConfigPortalBlocking(false);
   s_wm.startConfigPortal(config::kPortalApName);
+  if (!s_wm.getConfigPortalActive()) {
+    Serial.println("WiFi setup portal failed to start");
+    return false;
+  }
+  Serial.printf("WiFi setup AP ready: %s (%s)\n", config::kPortalApName,
+                config::kPortalIp);
   while (s_wm.getConfigPortalActive()) {
     bootButtonPollLongPress();
-    if (s_wm.process()) {
+    if (s_wm.process() && wifiLinkUp()) {
       return true;
     }
     delay(10);
@@ -332,7 +359,7 @@ void bootButtonPollLongPress() {
     const unsigned long down_ms = s_boot_down_ms;
     portEXIT_CRITICAL(&s_boot_mux);
 
-    if (!s_long_press_handled &&
+    if (!s_ignore_long_press_until_release && !s_long_press_handled &&
         millis() - down_ms >= config::kBootResetHoldMs) {
       s_long_press_handled = true;
       Serial.println("BOOT held — resetting WiFi");
@@ -343,6 +370,7 @@ void bootButtonPollLongPress() {
     s_boot_is_down = false;
     portEXIT_CRITICAL(&s_boot_mux);
     s_long_press_handled = false;
+    s_ignore_long_press_until_release = false;
   }
 }
 
@@ -379,6 +407,10 @@ bool wifiSetupConnect() {
   ensureWifiManager();
 
   const bool force_portal = consumeForceConfigPortal();
+  if (force_portal) {
+    // The reset may have happened before the user released BOOT.
+    s_ignore_long_press_until_release = true;
+  }
   WiFi.setAutoReconnect(false);
 
   if (force_portal) {

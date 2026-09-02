@@ -19,7 +19,7 @@ constexpr long kMaxReportAgeSec = 90 * 60;
 
 /**
  * Extracts the first "<!-- METAR ... -->" / "<!-- SPECI ... -->" TAC comment
- * from a raw KNMI IWXXM file body, collapsing internal whitespace/newlines to
+ * from a raw IWXXM file body, collapsing internal whitespace/newlines to
  * single spaces. Writes a null-terminated string into `out`. Returns false if
  * no such comment is present (e.g. truncated/malformed file) -- this is
  * distinct from "comment present but not an EHAM report", which is handled by
@@ -36,7 +36,7 @@ bool extractTacComment(const char* body, size_t len, char* out, size_t out_len);
  */
 ParseResult parseTacLine(const char* tac, std::time_t now_utc, EhamWeather* out);
 
-/** Convenience: extractTacComment() + parseTacLine() over a raw KNMI file body. */
+/** Convenience: extractTacComment() + parseTacLine() over a raw IWXXM file body. */
 ParseResult parseKnmiMetarFile(const char* body, size_t len, std::time_t now_utc, EhamWeather* out);
 
 #if defined(EHAM_ENABLE_FIXTURES)
